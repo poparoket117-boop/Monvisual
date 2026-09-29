@@ -1,4 +1,4 @@
--- Kimiko-style GUI (волна, motion blur, туман, скай шейдер)
+-- Kimiko-style GUI (motion blur, туман, сохранение ползунков)
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -12,25 +12,29 @@ local function getThemeColor() return Color3.fromHSV(themeHue / 360, 0.6, 0.15) 
 local function getAccentColor() return Color3.fromHSV(themeHue / 360, 0.7, 0.9) end
 local transparency = 0.3
 
-local stretchEnabled = false
-local STRETCH_FACTOR = 0.75
-local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,STRETCH_FACTOR,0, 0,0,1)
-local fovEnabled = false
-local fovValue = 90
-local particlesEnabled = false
-local particleAttachment = nil
-local particleEmitter = nil
-local targetESPEnabled = false
-local espHighlight = nil
-local landingCircleEnabled = false
-local rippleSize = 1 -- регулировка размера волны
-local motionBlurEnabled = false
-local motionBlurAmount = 5
-local fogEnabled = false
-local fogStart = 50
-local fogEnd = 500
-local skyShaderEnabled = false
-local skyShaderID = 105721322908215
+-- Все настройки хранятся в таблице, чтобы не сбрасывались
+local settings = {
+    stretchEnabled = false,
+    STRETCH_FACTOR = 0.75,
+    fovEnabled = false,
+    fovValue = 90,
+    particlesEnabled = false,
+    targetESPEnabled = false,
+    landingCircleEnabled = false,
+    rippleSize = 1,
+    motionBlurEnabled = false,
+    motionBlurAmount = 3,
+    fogEnabled = false,
+    fogStart = 50,
+    fogEnd = 500,
+    skyShaderEnabled = false,
+    skyShaderID = 105721322908215
+}
+
+local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
+local particleAttachment, particleEmitter
+local espHighlight
+local lastCameraCFrame = Camera.CFrame
 
 local themeElements = {}
 local function registerThemeElement(obj, prop)
@@ -141,7 +145,7 @@ local cardLayout = Instance.new("UIGridLayout", CardContainer)
 cardLayout.CellSize = UDim2.new(0.48, 0, 0, 60)
 cardLayout.CellPadding = UDim2.new(0.02, 0, 0, 10)
 
-local settingsWindows = {}
+-- Настройки (сохраняются)
 local function openSettings(title, min, max, default, callback)
     local SettingsFrame = Instance.new("Frame", ScreenGui)
     SettingsFrame.Size = UDim2.new(0, 300, 0, 150)
@@ -221,7 +225,7 @@ local function openSettings(title, min, max, default, callback)
             knob.Position = UDim2.new(pos, -8, 0, 0)
             local val = min + pos * (max - min)
             valueLabel.Text = "Значение: " .. string.format("%.2f", val)
-            callback(val)
+            callback(val) -- сразу применяем и сохраняем
         end
     end
     slider.InputBegan:Connect(function(input)
@@ -338,38 +342,38 @@ end
 local fovFunc = {
     name = "FOV",
     desc = "Меняет поле зрения.",
-    getState = function() return fovEnabled end,
+    getState = function() return settings.fovEnabled end,
     settings = function()
-        openSettings("FOV", 30, 120, 90, function(v)
-            fovValue = v
-            if fovEnabled then Camera.FieldOfView = v end
+        openSettings("FOV", 30, 120, settings.fovValue, function(v)
+            settings.fovValue = v
+            if settings.fovEnabled then Camera.FieldOfView = v end
         end)
     end,
     callback = function(on)
-        fovEnabled = on
-        Camera.FieldOfView = on and fovValue or 70
+        settings.fovEnabled = on
+        Camera.FieldOfView = on and settings.fovValue or 70
     end
 }
 
 local stretchFunc = {
     name = "Растяг 4:3",
     desc = "Растягивает экран.",
-    getState = function() return stretchEnabled end,
+    getState = function() return settings.stretchEnabled end,
     settings = function()
-        openSettings("Растяг", 50, 100, 75, function(v)
-            STRETCH_FACTOR = v / 100
-            stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,STRETCH_FACTOR,0, 0,0,1)
+        openSettings("Растяг", 50, 100, settings.STRETCH_FACTOR * 100, function(v)
+            settings.STRETCH_FACTOR = v / 100
+            stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
         end)
     end,
-    callback = function(on) stretchEnabled = on end
+    callback = function(on) settings.stretchEnabled = on end
 }
 
 local particlesFunc = {
     name = "Партиклы",
     desc = "Частицы при ходьбе.",
-    getState = function() return particlesEnabled end,
+    getState = function() return settings.particlesEnabled end,
     callback = function(on)
-        particlesEnabled = on
+        settings.particlesEnabled = on
         if on then
             local char = Player.Character
             if char then
@@ -396,7 +400,7 @@ local particlesFunc = {
 }
 
 RunService.Heartbeat:Connect(function()
-    if not particlesEnabled or not particleEmitter then return end
+    if not settings.particlesEnabled or not particleEmitter then return end
     local char = Player.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -411,15 +415,15 @@ end)
 local targetFunc = {
     name = "Target ESP",
     desc = "Подсвечивает игрока в 5 метрах.",
-    getState = function() return targetESPEnabled end,
+    getState = function() return settings.targetESPEnabled end,
     callback = function(on)
-        targetESPEnabled = on
+        settings.targetESPEnabled = on
         if espHighlight then espHighlight:Destroy() espHighlight = nil end
     end
 }
 
 RunService.Heartbeat:Connect(function()
-    if not targetESPEnabled then
+    if not settings.targetESPEnabled then
         if espHighlight then espHighlight:Destroy() espHighlight = nil end
         return
     end
@@ -461,78 +465,77 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Волна при прыжке с регулировкой
 local circleFunc = {
     name = "Волна при прыжке",
     desc = "Эффект капли при прыжке.",
-    getState = function() return landingCircleEnabled end,
+    getState = function() return settings.landingCircleEnabled end,
     settings = function()
-        openSettings("Размер волны", 0.5, 5, 1, function(v)
-            rippleSize = v
+        openSettings("Размер волны", 0.5, 5, settings.rippleSize, function(v)
+            settings.rippleSize = v
         end)
     end,
-    callback = function(on) landingCircleEnabled = on end
+    callback = function(on) settings.landingCircleEnabled = on end
 }
 
--- Motion Blur
+-- Motion Blur (только при движении камеры)
 local blurFunc = {
     name = "Motion Blur",
-    desc = "Размытие при движении.",
-    getState = function() return motionBlurEnabled end,
+    desc = "Размытие при движении камеры.",
+    getState = function() return settings.motionBlurEnabled end,
     settings = function()
-        openSettings("Сила размытия", 1, 20, 5, function(v)
-            motionBlurAmount = v
+        openSettings("Сила размытия", 1, 10, settings.motionBlurAmount, function(v)
+            settings.motionBlurAmount = v
         end)
     end,
     callback = function(on)
-        motionBlurEnabled = on
-        if on then
-            local blur = Lighting:FindFirstChild("KimikoBlur")
-            if not blur then
-                blur = Instance.new("BlurEffect")
-                blur.Name = "KimikoBlur"
-                blur.Size = motionBlurAmount
-                blur.Parent = Lighting
-            end
-            RunService.RenderStepped:Connect(function()
-                if motionBlurEnabled then
-                    local char = Player.Character
-                    if char then
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        if hum then
-                            local blur2 = Lighting:FindFirstChild("KimikoBlur")
-                            if blur2 then
-                                blur2.Size = hum.MoveDirection.Magnitude > 0.1 and motionBlurAmount or 0
-                            end
-                        end
-                    end
-                end
-            end)
-        else
+        settings.motionBlurEnabled = on
+        if not on then
             local blur = Lighting:FindFirstChild("KimikoBlur")
             if blur then blur:Destroy() end
         end
     end
 }
 
--- Туман
+-- Постоянный loop: реагирует на движение камеры
+RunService.RenderStepped:Connect(function()
+    if not settings.motionBlurEnabled then return end
+
+    local current = Camera.CFrame
+    local delta = (current.Position - lastCameraCFrame.Position).Magnitude
+    local rotDelta = (current.LookVector - lastCameraCFrame.LookVector).Magnitude
+    local movement = delta + rotDelta * 0.5
+
+    local blur = Lighting:FindFirstChild("KimikoBlur")
+    if not blur then
+        blur = Instance.new("BlurEffect")
+        blur.Name = "KimikoBlur"
+        blur.Parent = Lighting
+    end
+    -- Слабое размытие, только при движении
+    blur.Size = math.clamp(movement * settings.motionBlurAmount * 20, 0, settings.motionBlurAmount)
+
+    lastCameraCFrame = current
+end)
+
 local fogFunc = {
     name = "Туман",
     desc = "Регулируемый туман.",
-    getState = function() return fogEnabled end,
+    getState = function() return settings.fogEnabled end,
     settings = function()
-        openSettings("Дальность тумана", 0, 1000, 500, function(v)
-            fogEnd = v
-            if fogEnabled then
+        openSettings("Дальность тумана", 50, 1000, settings.fogEnd, function(v)
+            settings.fogEnd = v
+            if settings.fogEnabled then
                 Lighting.FogEnd = v
+                Lighting.FogStart = v * 0.3
             end
         end)
     end,
     callback = function(on)
-        fogEnabled = on
+        settings.fogEnabled = on
         if on then
-            Lighting.FogEnd = fogEnd
-            Lighting.FogStart = fogStart
+            Lighting.FogEnd = settings.fogEnd
+            Lighting.FogStart = settings.fogStart
+            Lighting.FogColor = Color3.fromRGB(150, 150, 200)
         else
             Lighting.FogEnd = 100000
             Lighting.FogStart = 0
@@ -540,32 +543,23 @@ local fogFunc = {
     end
 }
 
--- Шейдер Скай
 local skyShaderFunc = {
     name = "Шейдер Скай",
     desc = "Меняет небо.",
-    getState = function() return skyShaderEnabled end,
-    settings = function()
-        openSettings("Яркость неба", 0.1, 2, 1, function(v)
-            local sky = Lighting:FindFirstChild("KimikoSky")
-            if sky then
-                sky.SkyboxBk = skyShaderID
-            end
-        end)
-    end,
+    getState = function() return settings.skyShaderEnabled end,
     callback = function(on)
-        skyShaderEnabled = on
+        settings.skyShaderEnabled = on
         if on then
             local existing = Lighting:FindFirstChild("KimikoSky")
             if existing then existing:Destroy() end
             local sky = Instance.new("Sky")
             sky.Name = "KimikoSky"
-            sky.SkyboxBk = "rbxassetid://105721322908215"
-            sky.SkyboxDn = "rbxassetid://105721322908215"
-            sky.SkyboxFt = "rbxassetid://105721322908215"
-            sky.SkyboxLf = "rbxassetid://105721322908215"
-            sky.SkyboxRt = "rbxassetid://105721322908215"
-            sky.SkyboxUp = "rbxassetid://105721322908215"
+            sky.SkyboxBk = "rbxassetid://" .. settings.skyShaderID
+            sky.SkyboxDn = "rbxassetid://" .. settings.skyShaderID
+            sky.SkyboxFt = "rbxassetid://" .. settings.skyShaderID
+            sky.SkyboxLf = "rbxassetid://" .. settings.skyShaderID
+            sky.SkyboxRt = "rbxassetid://" .. settings.skyShaderID
+            sky.SkyboxUp = "rbxassetid://" .. settings.skyShaderID
             sky.Parent = Lighting
         else
             local sky = Lighting:FindFirstChild("KimikoSky")
@@ -575,7 +569,7 @@ local skyShaderFunc = {
 }
 
 RunService.RenderStepped:Connect(function()
-    if stretchEnabled then
+    if settings.stretchEnabled then
         Camera.CFrame = Camera.CFrame * stretchCFrame
     end
 end)
@@ -594,7 +588,7 @@ local function spawnRipple(pos)
             ring.Transparency = 0.5
             ring.Parent = workspace
             local tween = TweenService:Create(ring, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Size = Vector3.new(0.1, (10 + i * 3) * rippleSize, (10 + i * 3) * rippleSize),
+                Size = Vector3.new(0.1, (10 + i * 3) * settings.rippleSize, (10 + i * 3) * settings.rippleSize),
                 Transparency = 1
             })
             tween:Play()
@@ -605,7 +599,7 @@ end
 
 local wasJumping = false
 RunService.Heartbeat:Connect(function()
-    if not landingCircleEnabled then return end
+    if not settings.landingCircleEnabled then return end
     local char = Player.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
