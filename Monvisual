@@ -1,4 +1,4 @@
--- Monvisual GUI (Final)
+-- Monvisual GUI (Fixed theme sync)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -481,6 +481,7 @@ for _, name in ipairs(categories) do
     btn.TextXAlignment = Enum.TextXAlignment.Left
     local c = Instance.new("UICorner", btn)
     c.CornerRadius = UDim.new(0, 8)
+    -- РЕГИСТРИРУЕМ КАЖДУЮ КНОПКУ КАТЕГОРИИ
     registerThemeElement(btn, "bg")
     registerThemeElement(btn, "text")
     table.insert(catButtons, btn)
@@ -762,7 +763,7 @@ local targetFunc = {name = "Target ESP", desc = "Ромбики на ближа�
         end
     end}
 
--- Target ESP: ближайший игрок в радиусе 30 м
+-- Target ESP
 RunService.Heartbeat:Connect(function()
     if not settings.targetESPEnabled then
         for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
@@ -775,7 +776,6 @@ RunService.Heartbeat:Connect(function()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    -- Находим БЛИЖАЙШЕГО игрока в радиусе 30 м
     local closest, closestDist = nil, 30
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
@@ -831,7 +831,6 @@ RunService.Heartbeat:Connect(function()
             end
         end
     else
-        -- Если ближайший игрок дальше 30 м — убираем ромбики
         for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
         espDiamonds = {}
         espTargetCFrame = nil
@@ -951,9 +950,9 @@ end)
 local baseThemes = {
     {name = "Фиолетовая", hue = 270},
     {name = "Синяя", hue = 220},
-    {name = "Красная", hue = 0},
+    {name = "Красная", hue = 0, accentHue = 0},
     {name = "Зелёная", hue = 120},
-    {name = "Розовая", hue = 320},
+    {name = "Розовая", hue = 320, accentHue = 320},
     {name = "Голубая", hue = 190},
     {name = "Жёлтая", hue = 50},
     {name = "Прозрачная", custom = Color3.fromRGB(30, 30, 40), transparent = 0.7}
@@ -987,13 +986,13 @@ local function showThemes()
             if t.custom then
                 themeCustomColor = t.custom
                 themeCustomTransparency = t.transparent
-                updateTheme()
+                themeHue = 0
             else
                 themeCustomColor = nil
                 themeCustomTransparency = nil
                 themeHue = t.hue
-                updateTheme()
             end
+            updateTheme()
             SaveConfig()
         end)
     end
