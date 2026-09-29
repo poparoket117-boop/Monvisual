@@ -1,4 +1,4 @@
--- Monvisual GUI (со скроллом и обводкой кнопки)
+-- Monvisual GUI
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -453,11 +453,6 @@ Logo.TextSize = 18
 Logo.Font = Enum.Font.GothamBold
 registerThemeElement(Logo, "text")
 
-local LogoStroke = Instance.new("UIStroke", Logo)
-LogoStroke.Color = Color3.fromRGB(0, 0, 0)
-LogoStroke.Thickness = 2
-LogoStroke.Transparency = 0.2
-
 RunService.Heartbeat:Connect(function()
     local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
     Logo.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: " .. ping
@@ -503,22 +498,21 @@ SectionTitle.Font = Enum.Font.GothamBold
 SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
 registerThemeElement(SectionTitle, "text")
 
--- СКРОЛЛ (функции не выходят за пределы)
 local CardContainer = Instance.new("ScrollingFrame", Content)
-CardContainer.Size = UDim2.new(1, 0, 1, -40)
+CardContainer.Size = UDim2.new(1, -10, 1, -45)
 CardContainer.Position = UDim2.new(0, 0, 0, 40)
 CardContainer.BackgroundTransparency = 1
 CardContainer.BorderSizePixel = 0
 CardContainer.ScrollBarThickness = 4
 CardContainer.ScrollBarImageColor3 = getAccentColor()
 CardContainer.ScrollBarImageTransparency = 0.5
-CardContainer.CanvasSize = UDim2.new(0, 0, 0, 0) -- авто
+CardContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
 
+-- КАРТОЧКИ ЧУТЬ МЕНЬШЕ (ячейки 0.47 и высота 55)
 local cardLayout = Instance.new("UIGridLayout", CardContainer)
-cardLayout.CellSize = UDim2.new(0.48, 0, 0, 60)
-cardLayout.CellPadding = UDim2.new(0.02, 0, 0, 10)
+cardLayout.CellSize = UDim2.new(0.47, 0, 0, 55)
+cardLayout.CellPadding = UDim2.new(0.015, 0, 0, 8)
 
--- Автообновление CanvasSize
 CardContainer.ChildAdded:Connect(function()
     task.wait()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
@@ -649,34 +643,34 @@ local function createCards(list)
         registerThemeElement(stroke, "stroke")
 
         local title = Instance.new("TextLabel", card)
-        title.Size = UDim2.new(0.6, 0, 0, 20)
+        title.Size = UDim2.new(0.6, 0, 0, 18)
         title.Position = UDim2.new(0.05, 0, 0.1, 0)
         title.BackgroundTransparency = 1
         title.Text = f.name
         title.TextColor3 = Color3.fromRGB(255, 255, 255)
-        title.TextSize = 14
+        title.TextSize = 13
         title.Font = Enum.Font.GothamBold
         title.TextXAlignment = Enum.TextXAlignment.Left
 
         local desc = Instance.new("TextLabel", card)
-        desc.Size = UDim2.new(0.9, 0, 0, 30)
+        desc.Size = UDim2.new(0.9, 0, 0, 25)
         desc.Position = UDim2.new(0.05, 0, 0.45, 0)
         desc.BackgroundTransparency = 1
         desc.Text = f.desc
         desc.TextColor3 = Color3.fromRGB(180, 170, 210)
-        desc.TextSize = 11
+        desc.TextSize = 10
         desc.Font = Enum.Font.Gotham
         desc.TextWrapped = true
         desc.TextXAlignment = Enum.TextXAlignment.Left
 
         if f.settings then
             local setBtn = Instance.new("TextButton", card)
-            setBtn.Size = UDim2.new(0, 20, 0, 20)
-            setBtn.Position = UDim2.new(1, -65, 0.2, 0)
+            setBtn.Size = UDim2.new(0, 18, 0, 18)
+            setBtn.Position = UDim2.new(1, -60, 0.15, 0)
             setBtn.BackgroundColor3 = getAccentColor()
             setBtn.Text = "⚙"
             setBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            setBtn.TextSize = 14
+            setBtn.TextSize = 13
             setBtn.BorderSizePixel = 0
             local setCorner = Instance.new("UICorner", setBtn)
             setCorner.CornerRadius = UDim.new(0, 6)
@@ -685,8 +679,8 @@ local function createCards(list)
         end
 
         local toggle = Instance.new("TextButton", card)
-        toggle.Size = UDim2.new(0, 30, 0, 16)
-        toggle.Position = UDim2.new(1, -40, 0.2, 0)
+        toggle.Size = UDim2.new(0, 28, 0, 15)
+        toggle.Position = UDim2.new(1, -36, 0.15, 0)
         toggle.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
         toggle.Text = ""
         toggle.BorderSizePixel = 0
@@ -694,8 +688,8 @@ local function createCards(list)
         tc.CornerRadius = UDim.new(1, 0)
 
         local knob = Instance.new("Frame", toggle)
-        knob.Size = UDim2.new(0, 12, 0, 12)
-        knob.Position = UDim2.new(0, 2, 0.5, -6)
+        knob.Size = UDim2.new(0, 11, 0, 11)
+        knob.Position = UDim2.new(0, 2, 0.5, -5.5)
         knob.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
         knob.BorderSizePixel = 0
         local kc = Instance.new("UICorner", knob)
@@ -703,7 +697,7 @@ local function createCards(list)
 
         if f.getState and f.getState() then
             toggle.BackgroundColor3 = getAccentColor()
-            knob.Position = UDim2.new(1, -14, 0.5, -6)
+            knob.Position = UDim2.new(1, -13, 0.5, -5.5)
         end
 
         toggle.MouseButton1Click:Connect(function()
@@ -712,10 +706,10 @@ local function createCards(list)
                 f.callback(newState)
                 if newState then
                     toggle.BackgroundColor3 = getAccentColor()
-                    knob.Position = UDim2.new(1, -14, 0.5, -6)
+                    knob.Position = UDim2.new(1, -13, 0.5, -5.5)
                 else
                     toggle.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
-                    knob.Position = UDim2.new(0, 2, 0.5, -6)
+                    knob.Position = UDim2.new(0, 2, 0.5, -5.5)
                 end
                 SaveConfig()
             end
@@ -1139,7 +1133,7 @@ catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- ОБВЕДЁННЫЙ ВХОД В МЕНЮ
+-- КНОПКА ВХОДА (обводка на САМОЙ КНОПКЕ, не на тексте)
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 200, 0, 50)
 OpenBtn.Position = UDim2.new(0.5, -100, 0.03, 0)
@@ -1153,18 +1147,20 @@ OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: 0"
 local oc = Instance.new("UICorner", OpenBtn)
 oc.CornerRadius = UDim.new(0, 12)
 
--- Обводка кнопки (жирная, акцентная)
+-- Обводка КНОПКИ (толстая акцентная)
 local OpenStroke = Instance.new("UIStroke", OpenBtn)
 OpenStroke.Color = getAccentColor()
 OpenStroke.Thickness = 3
 OpenStroke.Transparency = 0
+OpenStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 registerThemeElement(OpenStroke, "stroke")
 
--- Внутренняя тонкая обводка (чёрная для контраста)
+-- Внутренняя тонкая чёрная обводка для контраста
 local OpenStroke2 = Instance.new("UIStroke", OpenBtn)
 OpenStroke2.Color = Color3.fromRGB(0, 0, 0)
 OpenStroke2.Thickness = 1
 OpenStroke2.Transparency = 0.3
+OpenStroke2.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 registerThemeElement(OpenBtn, "bg")
 registerThemeElement(OpenBtn, "text")
