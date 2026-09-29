@@ -1,10 +1,11 @@
--- Monvisual GUI
+-- Monvisual GUI (с сохранением настроек)
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local Stats = game:GetService("Stats")
+local HttpService = game:GetService("HttpService")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -13,6 +14,7 @@ local function getThemeColor() return Color3.fromHSV(themeHue / 360, 0.6, 0.15) 
 local function getAccentColor() return Color3.fromHSV(themeHue / 360, 0.7, 0.9) end
 local transparency = 0.3
 
+-- Настройки (всё, что сохраняется)
 local settings = {
     stretchEnabled = false, STRETCH_FACTOR = 0.75,
     fovEnabled = false, fovValue = 90,
@@ -25,8 +27,68 @@ local settings = {
     skyParticlesEnabled = false, skyParticlesDensity = 10,
     trailsEnabled = false, trailsTransparency = 0.5,
     wingsEnabled = false, wingsColor = Color3.fromRGB(180, 100, 255),
-    hatEnabled = false, hatColor = Color3.fromRGB(200, 160, 100)
+    hatEnabled = false, hatColor = Color3.fromRGB(200, 160, 100),
+    themeHue = 270
 }
+
+-- Сохранение
+local CONFIG_FILE = "Monvisual_config.json"
+local function SaveConfig()
+    local data = {}
+    for k, v in pairs(settings) do
+        if typeof(v) == "Color3" then
+            data[k] = {v.R, v.G, v.B}
+        else
+            data[k] = v
+        end
+    end
+    data.themeHue = themeHue
+    pcall(function()
+        writefile(CONFIG_FILE, HttpService:JSONEncode(data))
+    end)
+end
+
+local function LoadConfig()
+    if not isfile(CONFIG_FILE) then return end
+    local ok, data = pcall(function() return HttpService:JSONDecode(readfile(CONFIG_FILE)) end)
+    if not ok or not data then return end
+    for k, v in pairs(data) do
+        if k == "themeHue" then
+            themeHue = v
+        elseif k == "wingsColor" or k == "hatColor" then
+            settings[k] = Color3.new(v[1], v[2], v[3])
+        elseif settings[k] ~= nil then
+            settings[k] = v
+        end
+    end
+end
+
+LoadConfig()
+
+-- Применяем сохранённые функции при запуске
+local function ApplySavedSettings()
+    if settings.fovEnabled then Camera.FieldOfView = settings.fovValue end
+    if settings.fogEnabled then
+        Lighting.FogEnd = settings.fogEnd
+        Lighting.FogStart = settings.fogStart
+        Lighting.FogColor = getAccentColor()
+    end
+    if settings.skyShaderEnabled then
+        local existing = Lighting:FindFirstChild("MonvisualSky")
+        if existing then existing:Destroy() end
+        local sky = Instance.new("Sky")
+        sky.Name = "MonvisualSky"
+        sky.SkyboxBk = "rbxassetid://105721322908215"
+        sky.SkyboxDn = "rbxassetid://105721322908215"
+        sky.SkyboxFt = "rbxassetid://105721322908215"
+        sky.SkyboxLf = "rbxassetid://105721322908215"
+        sky.SkyboxRt = "rbxassetid://105721322908215"
+        sky.SkyboxUp = "rbxassetid://105721322908215"
+        sky.Parent = Lighting
+    end
+end
+
+task.spawn(ApplySavedSettings)
 
 local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
 local particleAttachment, particleEmitter
@@ -71,26 +133,6 @@ ScreenGui.Name = "Monvisual"
 ScreenGui.ResetOnSpawn = false
 pcall(function() ScreenGui.Parent = game.CoreGui end)
 
--- HUD (Monvisual | ник | пинг)
-local HUD = Instance.new("TextLabel", ScreenGui)
-HUD.Size = UDim2.new(0, 350, 0, 28)
-HUD.Position = UDim2.new(1, -360, 0, 10)
-HUD.BackgroundColor3 = getThemeColor()
-HUD.BackgroundTransparency = 0.3
-HUD.TextColor3 = getAccentColor()
-HUD.TextSize = 14
-HUD.Font = Enum.Font.GothamBold
-HUD.Text = "Monvisual | " .. Player.Name .. " | Ping: 0"
-local hudCorner = Instance.new("UICorner", HUD)
-hudCorner.CornerRadius = UDim.new(0, 8)
-registerThemeElement(HUD, "bg")
-registerThemeElement(HUD, "text")
-
-RunService.Heartbeat:Connect(function()
-    local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-    HUD.Text = "Monvisual | " .. Player.Name .. " | Ping: " .. ping
-end)
-
 -- Меню
 local Main = Instance.new("Frame", ScreenGui)
 Main.Size = UDim2.new(0, 700, 0, 420)
@@ -117,18 +159,24 @@ local sideCorner = Instance.new("UICorner", SideBar)
 sideCorner.CornerRadius = UDim.new(0, 18)
 registerThemeElement(SideBar, "bg")
 
+-- Логотип + ник + пинг
 local Logo = Instance.new("TextLabel", SideBar)
-Logo.Size = UDim2.new(1, 0, 0, 50)
+Logo.Size = UDim2.new(1, 0, 0, 70)
 Logo.BackgroundTransparency = 1
-Logo.Text = "⛧ MONVISUAL"
+Logo.Text = "⛧ MONVISUAL\n" .. Player.Name .. " | Ping: 0"
 Logo.TextColor3 = getAccentColor()
-Logo.TextSize = 22
+Logo.TextSize = 16
 Logo.Font = Enum.Font.GothamBold
 registerThemeElement(Logo, "text")
 
+RunService.Heartbeat:Connect(function()
+    local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+    Logo.Text = "⛧ MONVISUAL\n" .. Player.Name .. " | Ping: " .. ping
+end)
+
 local categories = {"Визуал", "Косметика", "Темы"}
 local catButtons = {}
-local catY = 110
+local catY = 130
 
 for _, name in ipairs(categories) do
     local btn = Instance.new("TextButton", SideBar)
@@ -176,9 +224,14 @@ cardLayout.CellSize = UDim2.new(0.48, 0, 0, 60)
 cardLayout.CellPadding = UDim2.new(0.02, 0, 0, 10)
 
 local function openSettings(title, min, max, default, callback)
+    -- Если окно с таким названием уже открыто — закрываем
+    local existing = ScreenGui:FindFirstChild("Settings_" .. title)
+    if existing then existing:Destroy() return end
+
     local SettingsFrame = Instance.new("Frame", ScreenGui)
-    SettingsFrame.Size = UDim2.new(0, 300, 0, 150)
-    SettingsFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    SettingsFrame.Name = "Settings_" .. title
+    SettingsFrame.Size = UDim2.new(0, 300, 0, 130)
+    SettingsFrame.Position = UDim2.new(0.5, -150, 0.5, -65)
     SettingsFrame.BackgroundColor3 = getThemeColor()
     SettingsFrame.BackgroundTransparency = 0.1
     SettingsFrame.BorderSizePixel = 0
@@ -188,17 +241,17 @@ local function openSettings(title, min, max, default, callback)
     registerThemeElement(SettingsFrame, "bg")
 
     local sfTitle = Instance.new("TextLabel", SettingsFrame)
-    sfTitle.Size = UDim2.new(1, 0, 0, 30)
+    sfTitle.Size = UDim2.new(1, 0, 0, 25)
     sfTitle.BackgroundTransparency = 1
     sfTitle.Text = title
     sfTitle.TextColor3 = getAccentColor()
-    sfTitle.TextSize = 16
+    sfTitle.TextSize = 15
     sfTitle.Font = Enum.Font.GothamBold
     registerThemeElement(sfTitle, "text")
 
     local slider = Instance.new("TextButton", SettingsFrame)
     slider.Size = UDim2.new(0.8, 0, 0, 20)
-    slider.Position = UDim2.new(0.1, 0, 0.4, 0)
+    slider.Position = UDim2.new(0.1, 0, 0.35, 0)
     slider.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
     slider.Text = ""
     slider.BorderSizePixel = 0
@@ -224,22 +277,12 @@ local function openSettings(title, min, max, default, callback)
 
     local valueLabel = Instance.new("TextLabel", SettingsFrame)
     valueLabel.Size = UDim2.new(1, 0, 0, 20)
-    valueLabel.Position = UDim2.new(0, 0, 0.62, 0)
+    valueLabel.Position = UDim2.new(0, 0, 0.6, 0)
     valueLabel.BackgroundTransparency = 1
-    valueLabel.Text = "Значение: " .. default
+    valueLabel.Text = "Значение: " .. string.format("%.2f", default)
     valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     valueLabel.TextSize = 13
     valueLabel.Font = Enum.Font.Gotham
-
-    local closeBtn = Instance.new("TextButton", SettingsFrame)
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 2)
-    closeBtn.BackgroundTransparency = 1
-    closeBtn.Text = "✕"
-    closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-    closeBtn.TextSize = 18
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.MouseButton1Click:Connect(function() SettingsFrame.Visible = false end)
 
     local dragging = false
     local function updateFromInput(input)
@@ -253,6 +296,7 @@ local function openSettings(title, min, max, default, callback)
             local val = min + pos * (max - min)
             valueLabel.Text = "Значение: " .. string.format("%.2f", val)
             callback(val)
+            SaveConfig()
         end
     end
     slider.InputBegan:Connect(function(input)
@@ -359,6 +403,7 @@ local function createCards(list)
                     toggle.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
                     knob.Position = UDim2.new(0, 2, 0.5, -6)
                 end
+                SaveConfig()
             end
         end)
         registerThemeElement(toggle, "accent")
@@ -469,12 +514,11 @@ local skyParticlesFunc = {
     end
 }
 
--- Шлейф с регулировкой прозрачности
 local trailsFunc = {
     name = "Movement Trails", desc = "Шлейф за игроком.",
     getState = function() return settings.trailsEnabled end,
     settings = function()
-        openSettings("Прозрачность шлейфа", 0.1, 1, settings.trailsTransparency, function(v)
+        openSettings("Прозрачность", 0.1, 1, settings.trailsTransparency, function(v)
             settings.trailsTransparency = v
         end)
     end,
@@ -496,7 +540,7 @@ local trailsFunc = {
                 if not hum or hum.MoveDirection.Magnitude < 0.1 then return end
 
                 local trail = Instance.new("Part")
-                trail.Size = Vector3.new(1, 2, 1)
+                trail.Size = Vector3.new(0.5, 3, 0.5) -- тоньше и выше
                 trail.CFrame = hrp.CFrame
                 trail.Anchored = true
                 trail.CanCollide = false
@@ -504,7 +548,7 @@ local trailsFunc = {
                 trail.Color = getAccentColor()
                 trail.Transparency = settings.trailsTransparency
                 trail.Parent = trailFolder
-                local tween = TweenService:Create(trail, TweenInfo.new(0.8, Enum.EasingStyle.Linear), {Transparency = 1, Size = Vector3.new(0.3,0.5,0.3)})
+                local tween = TweenService:Create(trail, TweenInfo.new(0.8, Enum.EasingStyle.Linear), {Transparency = 1, Size = Vector3.new(0.2, 0.5, 0.2)})
                 tween:Play()
                 tween.Completed:Connect(function() trail:Destroy() end)
             end)
@@ -631,6 +675,7 @@ local fogFunc = {
     end
 }
 
+-- ИСПРАВЛЕННЫЙ ШЕЙДЕР СКАЙ
 local skyShaderFunc = {
     name = "Шейдер Скай", desc = "Меняет небо.",
     getState = function() return settings.skyShaderEnabled end,
@@ -641,12 +686,12 @@ local skyShaderFunc = {
             if existing then existing:Destroy() end
             local sky = Instance.new("Sky")
             sky.Name = "MonvisualSky"
-            sky.SkyboxBk = "rbxassetid://" .. settings.skyShaderID
-            sky.SkyboxDn = "rbxassetid://" .. settings.skyShaderID
-            sky.SkyboxFt = "rbxassetid://" .. settings.skyShaderID
-            sky.SkyboxLf = "rbxassetid://" .. settings.skyShaderID
-            sky.SkyboxRt = "rbxassetid://" .. settings.skyShaderID
-            sky.SkyboxUp = "rbxassetid://" .. settings.skyShaderID
+            sky.SkyboxBk = "rbxassetid://105721322908215"
+            sky.SkyboxDn = "rbxassetid://105721322908215"
+            sky.SkyboxFt = "rbxassetid://105721322908215"
+            sky.SkyboxLf = "rbxassetid://105721322908215"
+            sky.SkyboxRt = "rbxassetid://105721322908215"
+            sky.SkyboxUp = "rbxassetid://105721322908215"
             sky.Parent = Lighting
         else
             local sky = Lighting:FindFirstChild("MonvisualSky")
@@ -735,7 +780,6 @@ local wingsFunc = {
     end
 }
 
--- Новая шляпа (настоящий конус, без «торта»)
 local hatFunc = {
     name = "Китайская шляпа", desc = "Рисовая конусная шляпа.",
     getState = function() return settings.hatEnabled end,
@@ -760,24 +804,20 @@ local hatFunc = {
                     hatModel.Name = "MonvisualHat"
                     hatModel.Parent = char
 
-                    -- Конус (используем Cylinder повёрнутый)
                     local cone = Instance.new("Part")
                     cone.Shape = Enum.PartType.Cylinder
-                    cone.Size = Vector3.new(1.2, 2.5, 2.5) -- высокий и узкий конус
+                    cone.Size = Vector3.new(1.2, 2.5, 2.5)
                     cone.Anchored = false
                     cone.CanCollide = false
                     cone.Material = Enum.Material.SmoothPlastic
                     cone.Color = settings.hatColor
                     cone.Parent = hatModel
-
                     local weld = Instance.new("Weld")
                     weld.Part0 = head
                     weld.Part1 = cone
-                    -- Ставим над головой, вертикально
                     weld.C0 = CFrame.new(0, 1.3, 0) * CFrame.Angles(0, 0, math.rad(90))
                     weld.Parent = cone
 
-                    -- Верхушка (тонкий кончик)
                     local top = Instance.new("Part")
                     top.Shape = Enum.PartType.Cylinder
                     top.Size = Vector3.new(0.5, 0.6, 0.6)
@@ -786,7 +826,6 @@ local hatFunc = {
                     top.Material = Enum.Material.SmoothPlastic
                     top.Color = settings.hatColor
                     top.Parent = hatModel
-
                     local weld2 = Instance.new("Weld")
                     weld2.Part0 = head
                     weld2.Part1 = top
@@ -896,6 +935,7 @@ local function showThemes()
                 themeHue = t.hue
                 updateTheme()
             end
+            SaveConfig()
         end)
     end
 
@@ -957,6 +997,7 @@ local function showThemes()
             hueLabel.Text = "Свой оттенок: " .. themeHue
             knob.Position = UDim2.new(pos, -9, 0.5, -9)
             updateTheme()
+            SaveConfig()
         end
     end
     slider.InputBegan:Connect(function(input)
@@ -1008,5 +1049,8 @@ registerThemeElement(OpenBtn, "text")
 OpenBtn.MouseButton1Click:Connect(function()
     Main.Visible = not Main.Visible
 end)
+
+-- Применяем сохранённую тему
+updateTheme()
 
 catButtons[1].MouseButton1Click:Fire()
