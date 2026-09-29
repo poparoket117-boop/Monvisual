@@ -1,8 +1,9 @@
--- Kimiko-style GUI (функции сохраняются, ESP 5м, без крестиков)
+-- Kimiko-style GUI (волна, motion blur, туман, скай шейдер)
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -22,6 +23,14 @@ local particleEmitter = nil
 local targetESPEnabled = false
 local espHighlight = nil
 local landingCircleEnabled = false
+local rippleSize = 1 -- регулировка размера волны
+local motionBlurEnabled = false
+local motionBlurAmount = 5
+local fogEnabled = false
+local fogStart = 50
+local fogEnd = 500
+local skyShaderEnabled = false
+local skyShaderID = 105721322908215
 
 local themeElements = {}
 local function registerThemeElement(obj, prop)
@@ -37,7 +46,6 @@ local function updateTheme()
             elseif item.prop == "accent" then item.obj.BackgroundColor3 = accent
             elseif item.prop == "text" then item.obj.TextColor3 = accent
             elseif item.prop == "stroke" then item.obj.Color = accent
-            elseif item.prop == "gradient" then item.obj.Color = ColorSequence.new(accent)
             end
         end
     end
@@ -133,7 +141,6 @@ local cardLayout = Instance.new("UIGridLayout", CardContainer)
 cardLayout.CellSize = UDim2.new(0.48, 0, 0, 60)
 cardLayout.CellPadding = UDim2.new(0.02, 0, 0, 10)
 
--- Настройки (без крестика, не закрывается при выходе из меню)
 local settingsWindows = {}
 local function openSettings(title, min, max, default, callback)
     local SettingsFrame = Instance.new("Frame", ScreenGui)
@@ -146,7 +153,6 @@ local function openSettings(title, min, max, default, callback)
     local sfCorner = Instance.new("UICorner", SettingsFrame)
     sfCorner.CornerRadius = UDim.new(0, 12)
     registerThemeElement(SettingsFrame, "bg")
-    table.insert(settingsWindows, SettingsFrame)
 
     local sfTitle = Instance.new("TextLabel", SettingsFrame)
     sfTitle.Size = UDim2.new(1, 0, 0, 30)
@@ -201,7 +207,7 @@ local function openSettings(title, min, max, default, callback)
     closeBtn.TextSize = 18
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.MouseButton1Click:Connect(function()
-        SettingsFrame.Visible = false -- просто скрываем, не удаляем
+        SettingsFrame.Visible = false
     end)
 
     local dragging = false
@@ -213,8 +219,8 @@ local function openSettings(title, min, max, default, callback)
             local pos = math.clamp((x - absX) / sizeX, 0, 1)
             fill.Size = UDim2.new(pos, 0, 1, 0)
             knob.Position = UDim2.new(pos, -8, 0, 0)
-            local val = math.floor(min + pos * (max - min))
-            valueLabel.Text = "Значение: " .. val
+            local val = min + pos * (max - min)
+            valueLabel.Text = "Значение: " .. string.format("%.2f", val)
             callback(val)
         end
     end
@@ -307,7 +313,6 @@ local function createCards(list)
         local kc = Instance.new("UICorner", knob)
         kc.CornerRadius = UDim.new(1, 0)
 
-        -- Восстанавливаем состояние при пересоздании
         if f.getState and f.getState() then
             toggle.BackgroundColor3 = getAccentColor()
             knob.Position = UDim2.new(1, -14, 0.5, -6)
@@ -326,7 +331,6 @@ local function createCards(list)
                 end
             end
         end)
-
         registerThemeElement(toggle, "accent")
     end
 end
@@ -404,7 +408,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Target ESP (только видимые игроки, максимум 5 метров, без стен)
 local targetFunc = {
     name = "Target ESP",
     desc = "Подсвечивает игрока в 5 метрах.",
@@ -415,7 +418,6 @@ local targetFunc = {
     end
 }
 
--- Постоянное обновление ESP (проверка видимости)
 RunService.Heartbeat:Connect(function()
     if not targetESPEnabled then
         if espHighlight then espHighlight:Destroy() espHighlight = nil end
@@ -427,14 +429,13 @@ RunService.Heartbeat:Connect(function()
     if not hrp then return end
 
     local closest = nil
-    local dist = 5 -- максимум 5 метров
+    local dist = 5
 
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             local targetHRP = p.Character.HumanoidRootPart
             local d = (targetHRP.Position - hrp.Position).Magnitude
             if d <= dist then
-                -- проверяем видимость (нет стен)
                 local ray = Ray.new(hrp.Position, (targetHRP.Position - hrp.Position).Unit * d)
                 local hit = workspace:FindPartOnRay(ray, char)
                 if not hit or hit:IsDescendantOf(p.Character) then
@@ -460,11 +461,117 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- Волна при прыжке с регулировкой
 local circleFunc = {
     name = "Волна при прыжке",
     desc = "Эффект капли при прыжке.",
     getState = function() return landingCircleEnabled end,
+    settings = function()
+        openSettings("Размер волны", 0.5, 5, 1, function(v)
+            rippleSize = v
+        end)
+    end,
     callback = function(on) landingCircleEnabled = on end
+}
+
+-- Motion Blur
+local blurFunc = {
+    name = "Motion Blur",
+    desc = "Размытие при движении.",
+    getState = function() return motionBlurEnabled end,
+    settings = function()
+        openSettings("Сила размытия", 1, 20, 5, function(v)
+            motionBlurAmount = v
+        end)
+    end,
+    callback = function(on)
+        motionBlurEnabled = on
+        if on then
+            local blur = Lighting:FindFirstChild("KimikoBlur")
+            if not blur then
+                blur = Instance.new("BlurEffect")
+                blur.Name = "KimikoBlur"
+                blur.Size = motionBlurAmount
+                blur.Parent = Lighting
+            end
+            RunService.RenderStepped:Connect(function()
+                if motionBlurEnabled then
+                    local char = Player.Character
+                    if char then
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        if hum then
+                            local blur2 = Lighting:FindFirstChild("KimikoBlur")
+                            if blur2 then
+                                blur2.Size = hum.MoveDirection.Magnitude > 0.1 and motionBlurAmount or 0
+                            end
+                        end
+                    end
+                end
+            end)
+        else
+            local blur = Lighting:FindFirstChild("KimikoBlur")
+            if blur then blur:Destroy() end
+        end
+    end
+}
+
+-- Туман
+local fogFunc = {
+    name = "Туман",
+    desc = "Регулируемый туман.",
+    getState = function() return fogEnabled end,
+    settings = function()
+        openSettings("Дальность тумана", 0, 1000, 500, function(v)
+            fogEnd = v
+            if fogEnabled then
+                Lighting.FogEnd = v
+            end
+        end)
+    end,
+    callback = function(on)
+        fogEnabled = on
+        if on then
+            Lighting.FogEnd = fogEnd
+            Lighting.FogStart = fogStart
+        else
+            Lighting.FogEnd = 100000
+            Lighting.FogStart = 0
+        end
+    end
+}
+
+-- Шейдер Скай
+local skyShaderFunc = {
+    name = "Шейдер Скай",
+    desc = "Меняет небо.",
+    getState = function() return skyShaderEnabled end,
+    settings = function()
+        openSettings("Яркость неба", 0.1, 2, 1, function(v)
+            local sky = Lighting:FindFirstChild("KimikoSky")
+            if sky then
+                sky.SkyboxBk = skyShaderID
+            end
+        end)
+    end,
+    callback = function(on)
+        skyShaderEnabled = on
+        if on then
+            local existing = Lighting:FindFirstChild("KimikoSky")
+            if existing then existing:Destroy() end
+            local sky = Instance.new("Sky")
+            sky.Name = "KimikoSky"
+            sky.SkyboxBk = "rbxassetid://105721322908215"
+            sky.SkyboxDn = "rbxassetid://105721322908215"
+            sky.SkyboxFt = "rbxassetid://105721322908215"
+            sky.SkyboxLf = "rbxassetid://105721322908215"
+            sky.SkyboxRt = "rbxassetid://105721322908215"
+            sky.SkyboxUp = "rbxassetid://105721322908215"
+            sky.Parent = Lighting
+        else
+            local sky = Lighting:FindFirstChild("KimikoSky")
+            if sky then sky:Destroy() end
+        end
+    end
 }
 
 RunService.RenderStepped:Connect(function()
@@ -487,7 +594,7 @@ local function spawnRipple(pos)
             ring.Transparency = 0.5
             ring.Parent = workspace
             local tween = TweenService:Create(ring, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Size = Vector3.new(0.1, 10 + i * 3, 10 + i * 3),
+                Size = Vector3.new(0.1, (10 + i * 3) * rippleSize, (10 + i * 3) * rippleSize),
                 Transparency = 1
             })
             tween:Play()
@@ -632,7 +739,7 @@ end
 
 catButtons[1].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Визуал"
-    createCards({fovFunc, stretchFunc, particlesFunc, targetFunc, circleFunc})
+    createCards({fovFunc, stretchFunc, particlesFunc, targetFunc, circleFunc, blurFunc, fogFunc, skyShaderFunc})
 end)
 
 catButtons[2].MouseButton1Click:Connect(function()
@@ -654,10 +761,8 @@ oc.CornerRadius = UDim.new(0, 10)
 registerThemeElement(OpenBtn, "bg")
 registerThemeElement(OpenBtn, "text")
 
--- Открытие/закрытие меню (настройки НЕ закрываются)
 OpenBtn.MouseButton1Click:Connect(function()
     Main.Visible = not Main.Visible
-    -- Настройки остаются открытыми
 end)
 
 catButtons[1].MouseButton1Click:Fire()
