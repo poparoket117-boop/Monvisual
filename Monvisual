@@ -1,4 +1,4 @@
--- Kimiko-style GUI (кастомная тема по HUE + эффект капли)
+-- Kimiko-style GUI (мгновенное обновление темы)
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -6,15 +6,9 @@ local TweenService = game:GetService("TweenService")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Цвет темы (через HUE)
-local themeHue = 270 -- фиолетовый по умолчанию
-local function getThemeColor()
-    return Color3.fromHSV(themeHue / 360, 0.6, 0.15)
-end
-local function getAccentColor()
-    return Color3.fromHSV(themeHue / 360, 0.7, 0.9)
-end
-
+local themeHue = 270
+local function getThemeColor() return Color3.fromHSV(themeHue / 360, 0.6, 0.15) end
+local function getAccentColor() return Color3.fromHSV(themeHue / 360, 0.7, 0.9) end
 local transparency = 0.3
 
 local stretchEnabled = false
@@ -29,13 +23,13 @@ local targetESPEnabled = false
 local espHighlight = nil
 local landingCircleEnabled = false
 
--- Список всех элементов для обновления цвета
+-- Хранилище всех элементов, у которых нужно менять цвет
 local themeElements = {}
-
 local function registerThemeElement(obj, prop)
     table.insert(themeElements, {obj = obj, prop = prop})
 end
 
+-- Мгновенное обновление темы
 local function updateTheme()
     local base = getThemeColor()
     local accent = getAccentColor()
@@ -49,12 +43,21 @@ local function updateTheme()
                 item.obj.TextColor3 = accent
             elseif item.prop == "stroke" then
                 item.obj.Color = accent
+            elseif item.prop == "gradient" then
+                item.obj.Color = ColorSequence.new(accent)
             end
         end
     end
+    -- Обновляем цвет у партиклов, если они есть
+    if particleEmitter then
+        particleEmitter.Color = ColorSequence.new(accent)
+    end
+    -- Обновляем Highlight
+    if espHighlight then
+        espHighlight.FillColor = accent
+    end
 end
 
--- GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "KimikoStyle"
 ScreenGui.ResetOnSpawn = false
@@ -112,6 +115,8 @@ for _, name in ipairs(categories) do
     btn.TextXAlignment = Enum.TextXAlignment.Left
     local c = Instance.new("UICorner", btn)
     c.CornerRadius = UDim.new(0, 8)
+    registerThemeElement(btn, "bg")
+    registerThemeElement(btn, "text")
     table.insert(catButtons, btn)
     catY = catY + 34
 end
@@ -141,7 +146,6 @@ local cardLayout = Instance.new("UIGridLayout", CardContainer)
 cardLayout.CellSize = UDim2.new(0.48, 0, 0, 60)
 cardLayout.CellPadding = UDim2.new(0.02, 0, 0, 10)
 
--- Ползунок настроек
 local function openSettings(title, min, max, default, callback)
     local SettingsFrame = Instance.new("Frame", ScreenGui)
     SettingsFrame.Size = UDim2.new(0, 300, 0, 150)
@@ -152,6 +156,7 @@ local function openSettings(title, min, max, default, callback)
     SettingsFrame.Active = true
     local sfCorner = Instance.new("UICorner", SettingsFrame)
     sfCorner.CornerRadius = UDim.new(0, 12)
+    registerThemeElement(SettingsFrame, "bg")
 
     local sfTitle = Instance.new("TextLabel", SettingsFrame)
     sfTitle.Size = UDim2.new(1, 0, 0, 30)
@@ -160,6 +165,7 @@ local function openSettings(title, min, max, default, callback)
     sfTitle.TextColor3 = getAccentColor()
     sfTitle.TextSize = 16
     sfTitle.Font = Enum.Font.GothamBold
+    registerThemeElement(sfTitle, "text")
 
     local slider = Instance.new("TextButton", SettingsFrame)
     slider.Size = UDim2.new(0.8, 0, 0, 20)
@@ -177,6 +183,7 @@ local function openSettings(title, min, max, default, callback)
     fill.BorderSizePixel = 0
     local fCorner = Instance.new("UICorner", fill)
     fCorner.CornerRadius = UDim.new(1, 0)
+    registerThemeElement(fill, "accent")
 
     local knob = Instance.new("Frame", slider)
     knob.Size = UDim2.new(0, 16, 1, 0)
@@ -203,9 +210,7 @@ local function openSettings(title, min, max, default, callback)
     closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     closeBtn.TextSize = 18
     closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.MouseButton1Click:Connect(function()
-        SettingsFrame:Destroy()
-    end)
+    closeBtn.MouseButton1Click:Connect(function() SettingsFrame:Destroy() end)
 
     local dragging = false
     local function updateFromInput(input)
@@ -239,7 +244,6 @@ local function openSettings(title, min, max, default, callback)
     end)
 end
 
--- Карточки функций
 local function createCards(list)
     for _, child in ipairs(CardContainer:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
@@ -290,9 +294,8 @@ local function createCards(list)
             setBtn.BorderSizePixel = 0
             local setCorner = Instance.new("UICorner", setBtn)
             setCorner.CornerRadius = UDim.new(0, 6)
-            setBtn.MouseButton1Click:Connect(function()
-                f.settings()
-            end)
+            registerThemeElement(setBtn, "accent")
+            setBtn.MouseButton1Click:Connect(function() f.settings() end)
         end
 
         local toggle = Instance.new("TextButton", card)
@@ -324,10 +327,12 @@ local function createCards(list)
             end
             if f.callback then pcall(f.callback, on) end
         end)
+
+        -- Регистрируем toggle, чтобы цвет обновлялся мгновенно
+        registerThemeElement(toggle, "accent")
     end
 end
 
--- Функции
 local fovFunc = {
     name = "FOV",
     desc = "Меняет поле зрения.",
@@ -352,40 +357,51 @@ local stretchFunc = {
             stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,STRETCH_FACTOR,0, 0,0,1)
         end)
     end,
-    callback = function(on)
-        stretchEnabled = on
-    end
+    callback = function(on) stretchEnabled = on end
 }
 
 local particlesFunc = {
     name = "Партиклы",
-    desc = "Частицы вокруг персонажа.",
+    desc = "Частицы при ходьбе.",
     callback = function(on)
         particlesEnabled = on
-        local char = Player.Character
-        if char then
-            if on then
+        if on then
+            local char = Player.Character
+            if char then
                 local hrp = char:FindFirstChild("HumanoidRootPart")
                 if hrp and not particleEmitter then
                     particleAttachment = Instance.new("Attachment", hrp)
                     particleEmitter = Instance.new("ParticleEmitter")
                     particleEmitter.Texture = "rbxassetid://296874871"
-                    particleEmitter.Rate = 30
-                    particleEmitter.Lifetime = NumberRange.new(1, 1.5)
-                    particleEmitter.Speed = NumberRange.new(2, 4)
+                    particleEmitter.Rate = 0
+                    particleEmitter.Lifetime = NumberRange.new(1, 1.8)
+                    particleEmitter.Speed = NumberRange.new(3, 6)
                     particleEmitter.SpreadAngle = Vector2.new(180, 180)
                     particleEmitter.Color = ColorSequence.new(getAccentColor())
-                    particleEmitter.Size = NumberSequence.new(0.5, 0)
+                    particleEmitter.Size = NumberSequence.new(0.8, 0)
                     particleEmitter.Transparency = NumberSequence.new(0, 1)
                     particleEmitter.Parent = particleAttachment
                 end
-            else
-                if particleEmitter then particleEmitter:Destroy() particleEmitter = nil end
-                if particleAttachment then particleAttachment:Destroy() particleAttachment = nil end
             end
+        else
+            if particleEmitter then particleEmitter:Destroy() particleEmitter = nil end
+            if particleAttachment then particleAttachment:Destroy() particleAttachment = nil end
         end
     end
 }
+
+RunService.Heartbeat:Connect(function()
+    if not particlesEnabled or not particleEmitter then return end
+    local char = Player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    if hum.MoveDirection.Magnitude > 0.1 then
+        particleEmitter.Rate = 60
+    else
+        particleEmitter.Rate = 0
+    end
+end)
 
 local targetFunc = {
     name = "Target ESP",
@@ -417,9 +433,7 @@ local targetFunc = {
 local circleFunc = {
     name = "Волна при прыжке",
     desc = "Эффект капли при прыжке/приземлении.",
-    callback = function(on)
-        landingCircleEnabled = on
-    end
+    callback = function(on) landingCircleEnabled = on end
 }
 
 RunService.RenderStepped:Connect(function()
@@ -428,29 +442,26 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Эффект капли (расходящиеся кольца)
 local function spawnRipple(pos)
-    for i = 1, 3 do
-        task.delay(i * 0.05, function()
+    for i = 1, 4 do
+        task.delay(i * 0.04, function()
             local ring = Instance.new("Part")
             ring.Shape = Enum.PartType.Cylinder
-            ring.Size = Vector3.new(0.1, 0.5, 0.5)
+            ring.Size = Vector3.new(0.1, 1, 1)
             ring.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90))
             ring.Anchored = true
             ring.CanCollide = false
             ring.Material = Enum.Material.Neon
             ring.Color = getAccentColor()
-            ring.Transparency = 0.4
+            ring.Transparency = 0.5
             ring.Parent = workspace
 
             local tween = TweenService:Create(ring, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Size = Vector3.new(0.1, 8 + i * 2, 8 + i * 2),
+                Size = Vector3.new(0.1, 10 + i * 3, 10 + i * 3),
                 Transparency = 1
             })
             tween:Play()
-            tween.Completed:Connect(function()
-                ring:Destroy()
-            end)
+            tween.Completed:Connect(function() ring:Destroy() end)
         end)
     end
 end
@@ -472,14 +483,49 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Вкладка "Темы" с ползунком HUE
+local baseThemes = {
+    {name = "Фиолетовая", hue = 270},
+    {name = "Синяя", hue = 220},
+    {name = "Красная", hue = 0},
+    {name = "Зелёная", hue = 120},
+    {name = "Розовая", hue = 320},
+    {name = "Голубая", hue = 190},
+    {name = "Жёлтая", hue = 50}
+}
+
 local function showThemes()
     for _, child in ipairs(CardContainer:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
     end
     SectionTitle.Text = "Темы"
 
-    -- Ползунок HUE
+    for i, t in ipairs(baseThemes) do
+        local card = Instance.new("Frame", CardContainer)
+        card.BackgroundColor3 = Color3.fromHSV(t.hue / 360, 0.6, 0.15)
+        card.BackgroundTransparency = 0.3
+        card.BorderSizePixel = 0
+        local cc = Instance.new("UICorner", card)
+        cc.CornerRadius = UDim.new(0, 10)
+
+        local title = Instance.new("TextLabel", card)
+        title.Size = UDim2.new(1, 0, 0, 20)
+        title.Position = UDim2.new(0, 0, 0.2, 0)
+        title.BackgroundTransparency = 1
+        title.Text = t.name
+        title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        title.TextSize = 14
+        title.Font = Enum.Font.GothamBold
+
+        local btn = Instance.new("TextButton", card)
+        btn.Size = UDim2.new(1, 0, 1, 0)
+        btn.BackgroundTransparency = 1
+        btn.Text = ""
+        btn.MouseButton1Click:Connect(function()
+            themeHue = t.hue
+            updateTheme()
+        end)
+    end
+
     local hueCard = Instance.new("Frame", CardContainer)
     hueCard.Size = UDim2.new(0.96, 0, 0, 100)
     hueCard.BackgroundColor3 = getThemeColor()
@@ -493,7 +539,7 @@ local function showThemes()
     hueLabel.Size = UDim2.new(1, 0, 0, 20)
     hueLabel.Position = UDim2.new(0, 0, 0.05, 0)
     hueLabel.BackgroundTransparency = 1
-    hueLabel.Text = "Оттенок темы: " .. themeHue
+    hueLabel.Text = "Свой оттенок: " .. themeHue
     hueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     hueLabel.TextSize = 14
     hueLabel.Font = Enum.Font.GothamBold
@@ -508,7 +554,6 @@ local function showThemes()
     local sCorner = Instance.new("UICorner", slider)
     sCorner.CornerRadius = UDim.new(1, 0)
 
-    -- Цветная заливка (градиент HUE)
     local gradient = Instance.new("UIGradient", slider)
     gradient.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
@@ -536,9 +581,9 @@ local function showThemes()
         if sizeX > 0 then
             local pos = math.clamp((x - absX) / sizeX, 0, 1)
             themeHue = math.floor(pos * 360)
-            hueLabel.Text = "Оттенок темы: " .. themeHue
+            hueLabel.Text = "Свой оттенок: " .. themeHue
             knob.Position = UDim2.new(pos, -9, 0.5, -9)
-            updateTheme()
+            updateTheme() -- мгновенное обновление
         end
     end
     slider.InputBegan:Connect(function(input)
@@ -568,7 +613,6 @@ catButtons[2].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- Кнопка открытия
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 120, 0, 40)
 OpenBtn.Position = UDim2.new(0.5, -60, 0.03, 0)
