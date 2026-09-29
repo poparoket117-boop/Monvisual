@@ -33,7 +33,7 @@ local settings = {
     fovEnabled = false, fovValue = 90,
     particlesEnabled = false,
     targetESPEnabled = false,
-    landingCircleEnabled = false, rippleSize = 0.1,
+    landingCircleEnabled = false, rippleSize = 0.1, rippleTransparency = 0.5,
     motionBlurEnabled = false, motionBlurAmount = 3,
     fogEnabled = false, fogStart = 50, fogEnd = 500,
     skyShaderEnabled = false, skyShaderID = 105721322908215,
@@ -73,6 +73,8 @@ LoadConfig()
 local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
 local particleAttachment, particleEmitter
 local espHighlight
+local espCorners = {}
+local espCornerCFrame = CFrame.new(0,0,0)
 local lastCameraCFrame = Camera.CFrame
 local skyParticleFolder, wingsModel, wingsCon, hatModel, trailFolder, trailCon
 
@@ -98,7 +100,9 @@ local function updateTheme()
     end
     if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
     if espHighlight then espHighlight.FillColor = accent end
-    if settings.fogEnabled then Lighting.FogColor = accent end
+    for _, c in ipairs(espCorners) do
+        if c and c.Parent then c.Color = accent end
+    end
 end
 
 -- ================== ФУНКЦИИ ==================
@@ -108,20 +112,14 @@ end
 local function ApplyFOV()
     Camera.FieldOfView = settings.fovEnabled and settings.fovValue or 70
 end
-
--- ИСПРАВЛЕНИЕ: партиклы пересоздаются корректно
 local function ApplyParticles()
-    -- Удаляем старое
     if particleEmitter then pcall(function() particleEmitter:Destroy() end) particleEmitter = nil end
     if particleAttachment then pcall(function() particleAttachment:Destroy() end) particleAttachment = nil end
-    
     if not settings.particlesEnabled then return end
-    
     local char = Player.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    
     particleAttachment = Instance.new("Attachment", hrp)
     particleEmitter = Instance.new("ParticleEmitter")
     particleEmitter.Texture = "rbxassetid://296874871"
@@ -134,7 +132,6 @@ local function ApplyParticles()
     particleEmitter.Transparency = NumberSequence.new(0, 1)
     particleEmitter.Parent = particleAttachment
 end
-
 local function ApplyFog()
     if settings.fogEnabled then
         Lighting.FogEnd = settings.fogEnd
@@ -398,33 +395,19 @@ local function ApplyMotionBlur()
         if blur then blur:Destroy() end
     end
 end
-
 local function ApplyAllFunctions()
-    ApplyFOV()
-    ApplyFog()
-    ApplySky()
-    ApplySkyParticles()
-    ApplyTrails()
-    ApplyRTX()
-    ApplyDayNight()
-    ApplyMotionBlur()
-    -- Ждём загрузки персонажа
+    ApplyFOV() ApplyFog() ApplySky() ApplySkyParticles() ApplyTrails()
+    ApplyRTX() ApplyDayNight() ApplyMotionBlur()
     task.spawn(function()
         local char = Player.Character or Player.CharacterAdded:Wait()
         task.wait(0.5)
-        ApplyParticles()  -- партиклы сразу
-        ApplyWings()
-        ApplyHat()
+        ApplyParticles() ApplyWings() ApplyHat()
     end)
 end
 task.spawn(ApplyAllFunctions)
-
 Player.CharacterAdded:Connect(function(char)
     task.wait(1)
-    -- при респавне заново применяем партиклы
-    ApplyParticles()
-    ApplyWings()
-    ApplyHat()
+    ApplyParticles() ApplyWings() ApplyHat()
 end)
 
 -- ================== GUI ==================
@@ -737,7 +720,7 @@ local function createCards(list)
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- ФУНКЦИИ (сокращённо)
+-- ФУНКЦИИ
 local fovFunc = {name = "FOV", desc = "Меняет поле зрения.", getState = function() return settings.fovEnabled end,
     settings = function() openSettings("FOV", 30, 120, settings.fovValue, function(v) settings.fovValue = v ApplyFOV() end) end,
     callback = function(on) settings.fovEnabled = on ApplyFOV() end}
@@ -761,11 +744,23 @@ local trailsFunc = {name = "Movement Trails", desc = "Шлейф за игрок
     settings = function() openSettings("Прозрачность", 0.1, 1, settings.trailsTransparency, function(v) settings.trailsTransparency = v end) end,
     callback = function(on) settings.trailsEnabled = on ApplyTrails() end}
 
-local targetFunc = {name = "Target ESP", desc = "Подсвечивает игрока в 5м.", getState = function() return settings.targetESPEnabled end,
-    callback = function(on) settings.targetESPEnabled = on if espHighlight then espHighlight:Destroy() espHighlight = nil end end}
+local targetFunc = {name = "Target ESP", desc = "Уголки вокруг игрока в 5м.", getState = function() return settings.targetESPEnabled end,
+    callback = function(on)
+        settings.targetESPEnabled = on
+        if espHighlight then espHighlight:Destroy() espHighlight = nil end
+        if not on then
+            for _, c in ipairs(espCorners) do if c and c.Parent then c:Destroy() end end
+            espCorners = {}
+        end
+    end}
 
+-- Target ESP: 4 вращающихся уголка (как рамка прицела)
 RunService.Heartbeat:Connect(function()
-    if not settings.targetESPEnabled then if espHighlight then espHighlight:Destroy() espHighlight = nil end return end
+    if not settings.targetESPEnabled then
+        for _, c in ipairs(espCorners) do if c and c.Parent then c:Destroy() end end
+        espCorners = {}
+        return
+    end
     local char = Player.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -783,22 +778,50 @@ RunService.Heartbeat:Connect(function()
         end
     end
     if closest then
-        if not espHighlight or espHighlight.Adornee ~= closest then
-            if espHighlight then espHighlight:Destroy() end
-            espHighlight = Instance.new("Highlight")
-            espHighlight.Adornee = closest
-            espHighlight.FillColor = getAccentColor()
-            espHighlight.FillTransparency = 0.5
-            espHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-            espHighlight.Parent = closest
+        local targetHRP = closest:FindFirstChild("HumanoidRootPart")
+        if targetHRP then
+            if #espCorners < 4 then
+                for _, c in ipairs(espCorners) do if c and c.Parent then c:Destroy() end end
+                espCorners = {}
+                for i = 1, 4 do
+                    local part = Instance.new("Part")
+                    part.Size = Vector3.new(0.15, 0.6, 0.15)
+                    part.Anchored = true
+                    part.CanCollide = false
+                    part.Material = Enum.Material.Neon
+                    part.Color = getAccentColor()
+                    part.Transparency = 0.2
+                    part.Parent = workspace
+                    table.insert(espCorners, part)
+                end
+            end
+            espCornerCFrame = espCornerCFrame * CFrame.Angles(0, math.rad(1.5), 0)
+            local center = targetHRP.Position
+            local radius = 2.5
+            local angles = {45, 135, 225, 315}
+            for i, angle in ipairs(angles) do
+                local part = espCorners[i]
+                if part then
+                    local rad = math.rad(angle)
+                    local x = math.cos(rad) * radius
+                    local y = math.sin(rad) * radius
+                    local offset = espCornerCFrame:VectorToWorldSpace(Vector3.new(x, y, 0))
+                    part.CFrame = CFrame.new(center + offset, center)
+                    part.Color = getAccentColor()
+                end
+            end
         end
     else
-        if espHighlight then espHighlight:Destroy() espHighlight = nil end
+        for _, c in ipairs(espCorners) do if c and c.Parent then c:Destroy() end end
+        espCorners = {}
     end
 end)
 
 local circleFunc = {name = "Волна при прыжке", desc = "Эффект капли при прыжке.", getState = function() return settings.landingCircleEnabled end,
-    settings = function() openSettings("Размер волны", 0.10, 5, settings.rippleSize, function(v) settings.rippleSize = v end) end,
+    settings = function()
+        openSettings("Размер волны", 0.10, 5, settings.rippleSize, function(v) settings.rippleSize = v end)
+        openSettings("Прозрачность волны", 0, 1, settings.rippleTransparency, function(v) settings.rippleTransparency = v end)
+    end,
     callback = function(on) settings.landingCircleEnabled = on end}
 
 local blurFunc = {name = "Motion Blur", desc = "Размытие при движении камеры.", getState = function() return settings.motionBlurEnabled end,
@@ -876,7 +899,7 @@ local function spawnRipple(pos)
             ring.CanCollide = false
             ring.Material = Enum.Material.Neon
             ring.Color = getAccentColor()
-            ring.Transparency = 0.5
+            ring.Transparency = settings.rippleTransparency
             ring.Parent = workspace
             local tween = TweenService:Create(ring, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = Vector3.new(0.1, (10 + i * 3) * settings.rippleSize, (10 + i * 3) * settings.rippleSize),
@@ -1052,12 +1075,12 @@ catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- ОБВОДКА (тоньше и прозрачнее)
+-- КНОПКА ВХОДА (тонкая полупрозрачная обводка)
 local OpenBorder = Instance.new("Frame", ScreenGui)
-OpenBorder.Size = UDim2.new(0, 206, 0, 56)
-OpenBorder.Position = UDim2.new(0.5, -103, 0.03, -3)
+OpenBorder.Size = UDim2.new(0, 204, 0, 54)
+OpenBorder.Position = UDim2.new(0.5, -102, 0.03, -2)
 OpenBorder.BackgroundColor3 = getAccentColor()
-OpenBorder.BackgroundTransparency = 0.5
+OpenBorder.BackgroundTransparency = 0.75
 OpenBorder.BorderSizePixel = 0
 OpenBorder.ZIndex = 1
 local obCorner = Instance.new("UICorner", OpenBorder)
