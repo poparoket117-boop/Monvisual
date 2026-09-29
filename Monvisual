@@ -108,28 +108,33 @@ end
 local function ApplyFOV()
     Camera.FieldOfView = settings.fovEnabled and settings.fovValue or 70
 end
+
+-- ИСПРАВЛЕНИЕ: партиклы пересоздаются корректно
 local function ApplyParticles()
-    local char = Player.Character or Player.CharacterAdded:Wait()
-    if settings.particlesEnabled then
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if hrp and not particleEmitter then
-            particleAttachment = Instance.new("Attachment", hrp)
-            particleEmitter = Instance.new("ParticleEmitter")
-            particleEmitter.Texture = "rbxassetid://296874871"
-            particleEmitter.Rate = 0
-            particleEmitter.Lifetime = NumberRange.new(1, 1.8)
-            particleEmitter.Speed = NumberRange.new(3, 6)
-            particleEmitter.SpreadAngle = Vector2.new(180, 180)
-            particleEmitter.Color = ColorSequence.new(getAccentColor())
-            particleEmitter.Size = NumberSequence.new(0.8, 0)
-            particleEmitter.Transparency = NumberSequence.new(0, 1)
-            particleEmitter.Parent = particleAttachment
-        end
-    else
-        if particleEmitter then particleEmitter:Destroy() particleEmitter = nil end
-        if particleAttachment then particleAttachment:Destroy() particleAttachment = nil end
-    end
+    -- Удаляем старое
+    if particleEmitter then pcall(function() particleEmitter:Destroy() end) particleEmitter = nil end
+    if particleAttachment then pcall(function() particleAttachment:Destroy() end) particleAttachment = nil end
+    
+    if not settings.particlesEnabled then return end
+    
+    local char = Player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    particleAttachment = Instance.new("Attachment", hrp)
+    particleEmitter = Instance.new("ParticleEmitter")
+    particleEmitter.Texture = "rbxassetid://296874871"
+    particleEmitter.Rate = 0
+    particleEmitter.Lifetime = NumberRange.new(1, 1.8)
+    particleEmitter.Speed = NumberRange.new(3, 6)
+    particleEmitter.SpreadAngle = Vector2.new(180, 180)
+    particleEmitter.Color = ColorSequence.new(getAccentColor())
+    particleEmitter.Size = NumberSequence.new(0.8, 0)
+    particleEmitter.Transparency = NumberSequence.new(0, 1)
+    particleEmitter.Parent = particleAttachment
 end
+
 local function ApplyFog()
     if settings.fogEnabled then
         Lighting.FogEnd = settings.fogEnd
@@ -393,19 +398,33 @@ local function ApplyMotionBlur()
         if blur then blur:Destroy() end
     end
 end
+
 local function ApplyAllFunctions()
-    ApplyFOV() ApplyFog() ApplySky() ApplySkyParticles() ApplyTrails()
-    ApplyRTX() ApplyDayNight() ApplyMotionBlur()
+    ApplyFOV()
+    ApplyFog()
+    ApplySky()
+    ApplySkyParticles()
+    ApplyTrails()
+    ApplyRTX()
+    ApplyDayNight()
+    ApplyMotionBlur()
+    -- Ждём загрузки персонажа
     task.spawn(function()
-        task.wait(1)
-        ApplyParticles() ApplyWings() ApplyHat()
+        local char = Player.Character or Player.CharacterAdded:Wait()
+        task.wait(0.5)
+        ApplyParticles()  -- партиклы сразу
+        ApplyWings()
+        ApplyHat()
     end)
 end
 task.spawn(ApplyAllFunctions)
 
-Player.CharacterAdded:Connect(function()
+Player.CharacterAdded:Connect(function(char)
     task.wait(1)
-    ApplyParticles() ApplyWings() ApplyHat()
+    -- при респавне заново применяем партиклы
+    ApplyParticles()
+    ApplyWings()
+    ApplyHat()
 end)
 
 -- ================== GUI ==================
@@ -492,7 +511,6 @@ SectionTitle.Font = Enum.Font.GothamBold
 SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
 registerThemeElement(SectionTitle, "text")
 
--- СКРОЛЛ С ОТСТУПАМИ (карточки не вылезают)
 local CardContainer = Instance.new("ScrollingFrame", Content)
 CardContainer.Size = UDim2.new(1, -15, 1, -50)
 CardContainer.Position = UDim2.new(0, 0, 0, 40)
@@ -503,7 +521,6 @@ CardContainer.ScrollBarImageColor3 = getAccentColor()
 CardContainer.ScrollBarImageTransparency = 0.5
 CardContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
 
--- Отступы внутри, чтобы карточки не липли к краям
 local cardPadding = Instance.new("UIPadding", CardContainer)
 cardPadding.PaddingLeft = UDim.new(0, 5)
 cardPadding.PaddingRight = UDim.new(0, 5)
@@ -720,7 +737,7 @@ local function createCards(list)
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- ФУНКЦИИ
+-- ФУНКЦИИ (сокращённо)
 local fovFunc = {name = "FOV", desc = "Меняет поле зрения.", getState = function() return settings.fovEnabled end,
     settings = function() openSettings("FOV", 30, 120, settings.fovValue, function(v) settings.fovValue = v ApplyFOV() end) end,
     callback = function(on) settings.fovEnabled = on ApplyFOV() end}
@@ -1035,16 +1052,16 @@ catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- КНОПКА ВХОДА С ОБВОДКОЙ ЧЕРЕЗ ОТДЕЛЬНЫЙ ФРЕЙМ
+-- ОБВОДКА (тоньше и прозрачнее)
 local OpenBorder = Instance.new("Frame", ScreenGui)
-OpenBorder.Size = UDim2.new(0, 210, 0, 60)
-OpenBorder.Position = UDim2.new(0.5, -105, 0.03, -5)
+OpenBorder.Size = UDim2.new(0, 206, 0, 56)
+OpenBorder.Position = UDim2.new(0.5, -103, 0.03, -3)
 OpenBorder.BackgroundColor3 = getAccentColor()
-OpenBorder.BackgroundTransparency = 0
+OpenBorder.BackgroundTransparency = 0.5
 OpenBorder.BorderSizePixel = 0
 OpenBorder.ZIndex = 1
 local obCorner = Instance.new("UICorner", OpenBorder)
-obCorner.CornerRadius = UDim.new(0, 14)
+obCorner.CornerRadius = UDim.new(0, 13)
 registerThemeElement(OpenBorder, "accent")
 
 local OpenBtn = Instance.new("TextButton", ScreenGui)
