@@ -10,9 +10,23 @@ local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local themeHue = 270
-local function getThemeColor() return Color3.fromHSV(themeHue / 360, 0.6, 0.15) end
-local function getAccentColor() return Color3.fromHSV(themeHue / 360, 0.7, 0.9) end
-local transparency = 0.3
+local themeCustomColor = nil
+local themeCustomTransparency = nil
+
+local function getThemeColor()
+    if themeCustomColor then return themeCustomColor end
+    return Color3.fromHSV(themeHue / 360, 0.6, 0.15)
+end
+local function getAccentColor()
+    if themeCustomColor then
+        return Color3.new(math.min(themeCustomColor.R + 0.5, 1), math.min(themeCustomColor.G + 0.5, 1), math.min(themeCustomColor.B + 0.5, 1))
+    end
+    return Color3.fromHSV(themeHue / 360, 0.7, 0.9)
+end
+local function getTransparency()
+    if themeCustomTransparency then return themeCustomTransparency end
+    return 0.3
+end
 
 local settings = {
     stretchEnabled = false, STRETCH_FACTOR = 0.75,
@@ -70,9 +84,12 @@ end
 local function updateTheme()
     local base = getThemeColor()
     local accent = getAccentColor()
+    local trans = getTransparency()
     for _, item in ipairs(themeElements) do
         if item.obj and item.obj.Parent then
-            if item.prop == "bg" then item.obj.BackgroundColor3 = base
+            if item.prop == "bg" then
+                item.obj.BackgroundColor3 = base
+                item.obj.BackgroundTransparency = trans
             elseif item.prop == "accent" then item.obj.BackgroundColor3 = accent
             elseif item.prop == "text" then item.obj.TextColor3 = accent
             elseif item.prop == "stroke" then item.obj.Color = accent
@@ -82,27 +99,15 @@ local function updateTheme()
     if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
     if espHighlight then espHighlight.FillColor = accent end
     if settings.fogEnabled then Lighting.FogColor = accent end
-    if wingsModel then
-        for _, p in ipairs(wingsModel:GetDescendants()) do
-            if p:IsA("BasePart") then p.Color = settings.wingsColor end
-        end
-    end
-    if hatModel then
-        for _, p in ipairs(hatModel:GetDescendants()) do
-            if p:IsA("BasePart") then p.Color = settings.hatColor end
-        end
-    end
 end
 
 -- ================== ФУНКЦИИ ==================
 local function ApplyStretch()
     if settings.stretchEnabled then Camera.CFrame = Camera.CFrame * stretchCFrame end
 end
-
 local function ApplyFOV()
     Camera.FieldOfView = settings.fovEnabled and settings.fovValue or 70
 end
-
 local function ApplyParticles()
     local char = Player.Character or Player.CharacterAdded:Wait()
     if settings.particlesEnabled then
@@ -125,7 +130,6 @@ local function ApplyParticles()
         if particleAttachment then particleAttachment:Destroy() particleAttachment = nil end
     end
 end
-
 local function ApplyFog()
     if settings.fogEnabled then
         Lighting.FogEnd = settings.fogEnd
@@ -136,7 +140,6 @@ local function ApplyFog()
         Lighting.FogStart = 0
     end
 end
-
 local function ApplySky()
     local existing = Lighting:FindFirstChild("MonvisualSky")
     if settings.skyShaderEnabled then
@@ -154,7 +157,6 @@ local function ApplySky()
         if existing then existing:Destroy() end
     end
 end
-
 local function ApplySkyParticles()
     if settings.skyParticlesEnabled then
         if skyParticleFolder then skyParticleFolder:Destroy() end
@@ -191,7 +193,6 @@ local function ApplySkyParticles()
         if skyParticleFolder then skyParticleFolder:Destroy() skyParticleFolder = nil end
     end
 end
-
 local function ApplyTrails()
     if trailCon then trailCon:Disconnect() trailCon = nil end
     if trailFolder then trailFolder:Destroy() trailFolder = nil end
@@ -222,7 +223,6 @@ local function ApplyTrails()
         end)
     end
 end
-
 local function ApplyWings()
     if wingsCon then wingsCon:Disconnect() wingsCon = nil end
     if wingsModel then wingsModel:Destroy() wingsModel = nil end
@@ -281,7 +281,6 @@ local function ApplyWings()
         end
     end)
 end
-
 local function ApplyHat()
     if hatModel then hatModel:Destroy() hatModel = nil end
     if not settings.hatEnabled then return end
@@ -319,7 +318,6 @@ local function ApplyHat()
     weld2.C0 = CFrame.new(0, 2.0, 0) * CFrame.Angles(0, 0, math.rad(90))
     weld2.Parent = top
 end
-
 local function ApplyRTX()
     if settings.rtxShadowsEnabled then
         Lighting.GlobalShadows = true
@@ -378,7 +376,6 @@ local function ApplyRTX()
         if ao then ao:Destroy() end
     end
 end
-
 local function ApplyDayNight()
     if settings.dayNightEnabled then
         Lighting.ClockTime = settings.dayNightTime
@@ -390,14 +387,12 @@ local function ApplyDayNight()
         Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
     end
 end
-
 local function ApplyMotionBlur()
     if not settings.motionBlurEnabled then
         local blur = Lighting:FindFirstChild("MonvisualBlur")
         if blur then blur:Destroy() end
     end
 end
-
 local function ApplyAllFunctions()
     ApplyFOV() ApplyFog() ApplySky() ApplySkyParticles() ApplyTrails()
     ApplyRTX() ApplyDayNight() ApplyMotionBlur()
@@ -423,7 +418,7 @@ local Main = Instance.new("Frame", ScreenGui)
 Main.Size = UDim2.new(0, 700, 0, 420)
 Main.Position = UDim2.new(0.5, -350, 0.5, -210)
 Main.BackgroundColor3 = getThemeColor()
-Main.BackgroundTransparency = transparency
+Main.BackgroundTransparency = getTransparency()
 Main.BorderSizePixel = 0
 Main.Active = false
 local mainCorner = Instance.new("UICorner", Main)
@@ -438,7 +433,7 @@ registerThemeElement(Stroke, "stroke")
 local SideBar = Instance.new("Frame", Main)
 SideBar.Size = UDim2.new(0, 200, 1, 0)
 SideBar.BackgroundColor3 = getThemeColor()
-SideBar.BackgroundTransparency = transparency
+SideBar.BackgroundTransparency = getTransparency()
 SideBar.BorderSizePixel = 0
 local sideCorner = Instance.new("UICorner", SideBar)
 sideCorner.CornerRadius = UDim.new(0, 18)
@@ -461,7 +456,6 @@ end)
 local categories = {"Визуал", "Косметика", "Шейдеры", "Темы"}
 local catButtons = {}
 local catY = 130
-
 for _, name in ipairs(categories) do
     local btn = Instance.new("TextButton", SideBar)
     btn.Size = UDim2.new(0.85, 0, 0, 30)
@@ -498,8 +492,9 @@ SectionTitle.Font = Enum.Font.GothamBold
 SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
 registerThemeElement(SectionTitle, "text")
 
+-- СКРОЛЛ С ОТСТУПАМИ (карточки не вылезают)
 local CardContainer = Instance.new("ScrollingFrame", Content)
-CardContainer.Size = UDim2.new(1, -10, 1, -45)
+CardContainer.Size = UDim2.new(1, -15, 1, -50)
 CardContainer.Position = UDim2.new(0, 0, 0, 40)
 CardContainer.BackgroundTransparency = 1
 CardContainer.BorderSizePixel = 0
@@ -508,10 +503,16 @@ CardContainer.ScrollBarImageColor3 = getAccentColor()
 CardContainer.ScrollBarImageTransparency = 0.5
 CardContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
 
--- КАРТОЧКИ ЧУТЬ МЕНЬШЕ (ячейки 0.47 и высота 55)
+-- Отступы внутри, чтобы карточки не липли к краям
+local cardPadding = Instance.new("UIPadding", CardContainer)
+cardPadding.PaddingLeft = UDim.new(0, 5)
+cardPadding.PaddingRight = UDim.new(0, 5)
+cardPadding.PaddingTop = UDim.new(0, 5)
+cardPadding.PaddingBottom = UDim.new(0, 5)
+
 local cardLayout = Instance.new("UIGridLayout", CardContainer)
-cardLayout.CellSize = UDim2.new(0.47, 0, 0, 55)
-cardLayout.CellPadding = UDim2.new(0.015, 0, 0, 8)
+cardLayout.CellSize = UDim2.new(0.48, 0, 0, 55)
+cardLayout.CellPadding = UDim2.new(0.02, 0, 0, 8)
 
 CardContainer.ChildAdded:Connect(function()
     task.wait()
@@ -525,13 +526,12 @@ end)
 local function openSettings(title, min, max, default, callback)
     local existing = ScreenGui:FindFirstChild("Settings_" .. title)
     if existing then existing:Destroy() return end
-
     local SettingsFrame = Instance.new("Frame", ScreenGui)
     SettingsFrame.Name = "Settings_" .. title
     SettingsFrame.Size = UDim2.new(0, 300, 0, 150)
     SettingsFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
     SettingsFrame.BackgroundColor3 = getThemeColor()
-    SettingsFrame.BackgroundTransparency = 0.1
+    SettingsFrame.BackgroundTransparency = getTransparency()
     SettingsFrame.BorderSizePixel = 0
     SettingsFrame.Active = true
     local sfCorner = Instance.new("UICorner", SettingsFrame)
@@ -721,68 +721,34 @@ local function createCards(list)
 end
 
 -- ФУНКЦИИ
-local fovFunc = {
-    name = "FOV", desc = "Меняет поле зрения.",
-    getState = function() return settings.fovEnabled end,
-    settings = function()
-        openSettings("FOV", 30, 120, settings.fovValue, function(v) settings.fovValue = v ApplyFOV() end)
-    end,
-    callback = function(on) settings.fovEnabled = on ApplyFOV() end
-}
+local fovFunc = {name = "FOV", desc = "Меняет поле зрения.", getState = function() return settings.fovEnabled end,
+    settings = function() openSettings("FOV", 30, 120, settings.fovValue, function(v) settings.fovValue = v ApplyFOV() end) end,
+    callback = function(on) settings.fovEnabled = on ApplyFOV() end}
 
-local stretchFunc = {
-    name = "Растяг 4:3", desc = "Растягивает экран.",
-    getState = function() return settings.stretchEnabled end,
-    settings = function()
-        openSettings("Растяг", 50, 100, settings.STRETCH_FACTOR * 100, function(v)
-            settings.STRETCH_FACTOR = v / 100
-            stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
-        end)
-    end,
-    callback = function(on) settings.stretchEnabled = on end
-}
+local stretchFunc = {name = "Растяг 4:3", desc = "Растягивает экран.", getState = function() return settings.stretchEnabled end,
+    settings = function() openSettings("Растяг", 50, 100, settings.STRETCH_FACTOR * 100, function(v)
+        settings.STRETCH_FACTOR = v / 100
+        stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1) end) end,
+    callback = function(on) settings.stretchEnabled = on end}
 
-local particlesFunc = {
-    name = "Партиклы", desc = "Частицы при ходьбе.",
-    getState = function() return settings.particlesEnabled end,
-    callback = function(on) settings.particlesEnabled = on ApplyParticles() end
-}
+local particlesFunc = {name = "Партиклы", desc = "Частицы при ходьбе.", getState = function() return settings.particlesEnabled end,
+    callback = function(on) settings.particlesEnabled = on ApplyParticles() end}
 
-local skyParticlesFunc = {
-    name = "Партиклы неба", desc = "Ромбики в небе.",
-    getState = function() return settings.skyParticlesEnabled end,
-    settings = function()
-        openSettings("Плотность", 3, 30, settings.skyParticlesDensity, function(v)
-            settings.skyParticlesDensity = math.floor(v)
-            if settings.skyParticlesEnabled then ApplySkyParticles() end
-        end)
-    end,
-    callback = function(on) settings.skyParticlesEnabled = on ApplySkyParticles() end
-}
+local skyParticlesFunc = {name = "Партиклы неба", desc = "Ромбики в небе.", getState = function() return settings.skyParticlesEnabled end,
+    settings = function() openSettings("Плотность", 3, 30, settings.skyParticlesDensity, function(v)
+        settings.skyParticlesDensity = math.floor(v)
+        if settings.skyParticlesEnabled then ApplySkyParticles() end end) end,
+    callback = function(on) settings.skyParticlesEnabled = on ApplySkyParticles() end}
 
-local trailsFunc = {
-    name = "Movement Trails", desc = "Шлейф за игроком.",
-    getState = function() return settings.trailsEnabled end,
-    settings = function()
-        openSettings("Прозрачность", 0.1, 1, settings.trailsTransparency, function(v) settings.trailsTransparency = v end)
-    end,
-    callback = function(on) settings.trailsEnabled = on ApplyTrails() end
-}
+local trailsFunc = {name = "Movement Trails", desc = "Шлейф за игроком.", getState = function() return settings.trailsEnabled end,
+    settings = function() openSettings("Прозрачность", 0.1, 1, settings.trailsTransparency, function(v) settings.trailsTransparency = v end) end,
+    callback = function(on) settings.trailsEnabled = on ApplyTrails() end}
 
-local targetFunc = {
-    name = "Target ESP", desc = "Подсвечивает игрока в 5м.",
-    getState = function() return settings.targetESPEnabled end,
-    callback = function(on)
-        settings.targetESPEnabled = on
-        if espHighlight then espHighlight:Destroy() espHighlight = nil end
-    end
-}
+local targetFunc = {name = "Target ESP", desc = "Подсвечивает игрока в 5м.", getState = function() return settings.targetESPEnabled end,
+    callback = function(on) settings.targetESPEnabled = on if espHighlight then espHighlight:Destroy() espHighlight = nil end end}
 
 RunService.Heartbeat:Connect(function()
-    if not settings.targetESPEnabled then
-        if espHighlight then espHighlight:Destroy() espHighlight = nil end
-        return
-    end
+    if not settings.targetESPEnabled then if espHighlight then espHighlight:Destroy() espHighlight = nil end return end
     local char = Player.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -814,105 +780,47 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-local circleFunc = {
-    name = "Волна при прыжке", desc = "Эффект капли при прыжке.",
-    getState = function() return settings.landingCircleEnabled end,
-    settings = function()
-        openSettings("Размер волны", 0.10, 5, settings.rippleSize, function(v) settings.rippleSize = v end)
-    end,
-    callback = function(on) settings.landingCircleEnabled = on end
-}
+local circleFunc = {name = "Волна при прыжке", desc = "Эффект капли при прыжке.", getState = function() return settings.landingCircleEnabled end,
+    settings = function() openSettings("Размер волны", 0.10, 5, settings.rippleSize, function(v) settings.rippleSize = v end) end,
+    callback = function(on) settings.landingCircleEnabled = on end}
 
-local blurFunc = {
-    name = "Motion Blur", desc = "Размытие при движении камеры.",
-    getState = function() return settings.motionBlurEnabled end,
-    settings = function()
-        openSettings("Сила размытия", 1, 10, settings.motionBlurAmount, function(v) settings.motionBlurAmount = v end)
-    end,
-    callback = function(on) settings.motionBlurEnabled = on ApplyMotionBlur() end
-}
+local blurFunc = {name = "Motion Blur", desc = "Размытие при движении камеры.", getState = function() return settings.motionBlurEnabled end,
+    settings = function() openSettings("Сила размытия", 1, 10, settings.motionBlurAmount, function(v) settings.motionBlurAmount = v end) end,
+    callback = function(on) settings.motionBlurEnabled = on ApplyMotionBlur() end}
 
-local fogFunc = {
-    name = "Туман", desc = "Туман под цвет темы.",
-    getState = function() return settings.fogEnabled end,
-    settings = function()
-        openSettings("Дальность тумана", 50, 1000, settings.fogEnd, function(v) settings.fogEnd = v ApplyFog() end)
-    end,
-    callback = function(on) settings.fogEnabled = on ApplyFog() end
-}
+local fogFunc = {name = "Туман", desc = "Туман под цвет темы.", getState = function() return settings.fogEnabled end,
+    settings = function() openSettings("Дальность тумана", 50, 1000, settings.fogEnd, function(v) settings.fogEnd = v ApplyFog() end) end,
+    callback = function(on) settings.fogEnabled = on ApplyFog() end}
 
-local skyShaderFunc = {
-    name = "Шейдер Скай", desc = "Меняет небо.",
-    getState = function() return settings.skyShaderEnabled end,
-    callback = function(on) settings.skyShaderEnabled = on ApplySky() end
-}
+local skyShaderFunc = {name = "Шейдер Скай", desc = "Меняет небо.", getState = function() return settings.skyShaderEnabled end,
+    callback = function(on) settings.skyShaderEnabled = on ApplySky() end}
 
-local dayNightFunc = {
-    name = "Ночь / День", desc = "Переключить время суток.",
-    getState = function() return settings.dayNightEnabled end,
-    settings = function()
-        openSettings("Время (0-24)", 0, 24, settings.dayNightTime, function(v)
-            settings.dayNightTime = v ApplyDayNight()
-        end)
-    end,
-    callback = function(on) settings.dayNightEnabled = on ApplyDayNight() end
-}
+local dayNightFunc = {name = "Ночь / День", desc = "Переключить время суток.", getState = function() return settings.dayNightEnabled end,
+    settings = function() openSettings("Время (0-24)", 0, 24, settings.dayNightTime, function(v) settings.dayNightTime = v ApplyDayNight() end) end,
+    callback = function(on) settings.dayNightEnabled = on ApplyDayNight() end}
 
-local rtxShadowsFunc = {
-    name = "RTX Тени", desc = "Реалистичные тени + атмосфера.",
-    getState = function() return settings.rtxShadowsEnabled end,
-    settings = function()
-        openSettings("Сила теней", 0.1, 1, settings.rtxShadowsIntensity, function(v) settings.rtxShadowsIntensity = v ApplyRTX() end)
-    end,
-    callback = function(on) settings.rtxShadowsEnabled = on ApplyRTX() end
-}
+local rtxShadowsFunc = {name = "RTX Тени", desc = "Реалистичные тени + атмосфера.", getState = function() return settings.rtxShadowsEnabled end,
+    settings = function() openSettings("Сила теней", 0.1, 1, settings.rtxShadowsIntensity, function(v) settings.rtxShadowsIntensity = v ApplyRTX() end) end,
+    callback = function(on) settings.rtxShadowsEnabled = on ApplyRTX() end}
 
-local rtxReflectionsFunc = {
-    name = "RTX Отражения", desc = "Реалистичные отражения.",
-    getState = function() return settings.rtxReflectionsEnabled end,
-    callback = function(on) settings.rtxReflectionsEnabled = on ApplyRTX() end
-}
+local rtxReflectionsFunc = {name = "RTX Отражения", desc = "Реалистичные отражения.", getState = function() return settings.rtxReflectionsEnabled end,
+    callback = function(on) settings.rtxReflectionsEnabled = on ApplyRTX() end}
 
-local rtxAOFunc = {
-    name = "RTX AO", desc = "Затенение окружения.",
-    getState = function() return settings.rtxAOEnabled end,
-    settings = function()
-        openSettings("Сила AO", 0.1, 1, settings.rtxAOIntensity, function(v) settings.rtxAOIntensity = v ApplyRTX() end)
-    end,
-    callback = function(on) settings.rtxAOEnabled = on ApplyRTX() end
-}
+local rtxAOFunc = {name = "RTX AO", desc = "Затенение окружения.", getState = function() return settings.rtxAOEnabled end,
+    settings = function() openSettings("Сила AO", 0.1, 1, settings.rtxAOIntensity, function(v) settings.rtxAOIntensity = v ApplyRTX() end) end,
+    callback = function(on) settings.rtxAOEnabled = on ApplyRTX() end}
 
-local wingsFunc = {
-    name = "Крылья", desc = "Анимированные крылья.",
-    getState = function() return settings.wingsEnabled end,
-    settings = function()
-        openSettings("Цвет крыльев (HUE)", 0, 360, 270, function(v)
-            settings.wingsColor = Color3.fromHSV(v/360, 0.8, 1)
-            if wingsModel then
-                for _, p in ipairs(wingsModel:GetDescendants()) do
-                    if p:IsA("BasePart") then p.Color = settings.wingsColor end
-                end
-            end
-        end)
-    end,
-    callback = function(on) settings.wingsEnabled = on ApplyWings() end
-}
+local wingsFunc = {name = "Крылья", desc = "Анимированные крылья.", getState = function() return settings.wingsEnabled end,
+    settings = function() openSettings("Цвет крыльев (HUE)", 0, 360, 270, function(v)
+        settings.wingsColor = Color3.fromHSV(v/360, 0.8, 1)
+        if wingsModel then for _, p in ipairs(wingsModel:GetDescendants()) do if p:IsA("BasePart") then p.Color = settings.wingsColor end end end end) end,
+    callback = function(on) settings.wingsEnabled = on ApplyWings() end}
 
-local hatFunc = {
-    name = "Китайская шляпа", desc = "Рисовая конусная шляпа.",
-    getState = function() return settings.hatEnabled end,
-    settings = function()
-        openSettings("Цвет шляпы (HUE)", 0, 360, 30, function(v)
-            settings.hatColor = Color3.fromHSV(v/360, 0.6, 0.9)
-            if hatModel then
-                for _, p in ipairs(hatModel:GetDescendants()) do
-                    if p:IsA("BasePart") then p.Color = settings.hatColor end
-                end
-            end
-        end)
-    end,
-    callback = function(on) settings.hatEnabled = on ApplyHat() end
-}
+local hatFunc = {name = "Китайская шляпа", desc = "Рисовая конусная шляпа.", getState = function() return settings.hatEnabled end,
+    settings = function() openSettings("Цвет шляпы (HUE)", 0, 360, 30, function(v)
+        settings.hatColor = Color3.fromHSV(v/360, 0.6, 0.9)
+        if hatModel then for _, p in ipairs(hatModel:GetDescendants()) do if p:IsA("BasePart") then p.Color = settings.hatColor end end end end) end,
+    callback = function(on) settings.hatEnabled = on ApplyHat() end}
 
 RunService.Heartbeat:Connect(function()
     if not settings.particlesEnabled or not particleEmitter then return end
@@ -987,7 +895,7 @@ local baseThemes = {
     {name = "Розовая", hue = 320},
     {name = "Голубая", hue = 190},
     {name = "Жёлтая", hue = 50},
-    {name = "Прозрачная", hue = 0, custom = Color3.fromRGB(40, 40, 50), transparent = 0.7}
+    {name = "Прозрачная", custom = Color3.fromRGB(30, 30, 40), transparent = 0.7}
 }
 
 local function showThemes()
@@ -1016,17 +924,12 @@ local function showThemes()
         btn.Text = ""
         btn.MouseButton1Click:Connect(function()
             if t.custom then
-                themeHue = 0
-                for _, item in ipairs(themeElements) do
-                    if item.obj and item.obj.Parent then
-                        if item.prop == "bg" then item.obj.BackgroundColor3 = t.custom item.obj.BackgroundTransparency = t.transparent or 0.3
-                        elseif item.prop == "accent" then item.obj.BackgroundColor3 = Color3.fromRGB(180, 180, 200)
-                        elseif item.prop == "text" then item.obj.TextColor3 = Color3.fromRGB(220, 220, 240)
-                        elseif item.prop == "stroke" then item.obj.Color = Color3.fromRGB(180, 180, 200)
-                        end
-                    end
-                end
+                themeCustomColor = t.custom
+                themeCustomTransparency = t.transparent
+                updateTheme()
             else
+                themeCustomColor = nil
+                themeCustomTransparency = nil
                 themeHue = t.hue
                 updateTheme()
             end
@@ -1089,6 +992,8 @@ local function showThemes()
         if sizeX > 0 then
             local pos = math.clamp((x - absX) / sizeX, 0, 1)
             themeHue = math.floor(pos * 360)
+            themeCustomColor = nil
+            themeCustomTransparency = nil
             hueLabel.Text = "Свой оттенок: " .. themeHue
             knob.Position = UDim2.new(pos, -9, 0.5, -9)
             updateTheme()
@@ -1118,50 +1023,43 @@ catButtons[1].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Визуал"
     createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, blurFunc, fogFunc, skyShaderFunc, dayNightFunc})
 end)
-
 catButtons[2].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Косметика"
     createCards({wingsFunc, hatFunc})
 end)
-
 catButtons[3].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Шейдеры"
     createCards({rtxShadowsFunc, rtxReflectionsFunc, rtxAOFunc})
 end)
-
 catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- КНОПКА ВХОДА (обводка на САМОЙ КНОПКЕ, не на тексте)
+-- КНОПКА ВХОДА С ОБВОДКОЙ ЧЕРЕЗ ОТДЕЛЬНЫЙ ФРЕЙМ
+local OpenBorder = Instance.new("Frame", ScreenGui)
+OpenBorder.Size = UDim2.new(0, 210, 0, 60)
+OpenBorder.Position = UDim2.new(0.5, -105, 0.03, -5)
+OpenBorder.BackgroundColor3 = getAccentColor()
+OpenBorder.BackgroundTransparency = 0
+OpenBorder.BorderSizePixel = 0
+OpenBorder.ZIndex = 1
+local obCorner = Instance.new("UICorner", OpenBorder)
+obCorner.CornerRadius = UDim.new(0, 14)
+registerThemeElement(OpenBorder, "accent")
+
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 200, 0, 50)
 OpenBtn.Position = UDim2.new(0.5, -100, 0.03, 0)
 OpenBtn.BackgroundColor3 = getThemeColor()
-OpenBtn.BackgroundTransparency = transparency
+OpenBtn.BackgroundTransparency = 0
 OpenBtn.TextColor3 = getAccentColor()
 OpenBtn.TextSize = 14
 OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0
 OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: 0"
+OpenBtn.ZIndex = 2
 local oc = Instance.new("UICorner", OpenBtn)
 oc.CornerRadius = UDim.new(0, 12)
-
--- Обводка КНОПКИ (толстая акцентная)
-local OpenStroke = Instance.new("UIStroke", OpenBtn)
-OpenStroke.Color = getAccentColor()
-OpenStroke.Thickness = 3
-OpenStroke.Transparency = 0
-OpenStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-registerThemeElement(OpenStroke, "stroke")
-
--- Внутренняя тонкая чёрная обводка для контраста
-local OpenStroke2 = Instance.new("UIStroke", OpenBtn)
-OpenStroke2.Color = Color3.fromRGB(0, 0, 0)
-OpenStroke2.Thickness = 1
-OpenStroke2.Transparency = 0.3
-OpenStroke2.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
 registerThemeElement(OpenBtn, "bg")
 registerThemeElement(OpenBtn, "text")
 
