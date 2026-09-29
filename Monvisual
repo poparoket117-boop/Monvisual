@@ -1,4 +1,4 @@
--- Kimiko-style GUI (motion blur, туман, сохранение ползунков)
+-- Kimiko-style GUI (Косметика, партиклы неба, туман под тему)
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -12,7 +12,6 @@ local function getThemeColor() return Color3.fromHSV(themeHue / 360, 0.6, 0.15) 
 local function getAccentColor() return Color3.fromHSV(themeHue / 360, 0.7, 0.9) end
 local transparency = 0.3
 
--- Все настройки хранятся в таблице, чтобы не сбрасывались
 local settings = {
     stretchEnabled = false,
     STRETCH_FACTOR = 0.75,
@@ -28,13 +27,20 @@ local settings = {
     fogStart = 50,
     fogEnd = 500,
     skyShaderEnabled = false,
-    skyShaderID = 105721322908215
+    skyShaderID = 105721322908215,
+    skyParticlesEnabled = false,
+    wingsEnabled = false,
+    wingsColor = Color3.fromRGB(180, 100, 255),
+    hatEnabled = false
 }
 
 local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
 local particleAttachment, particleEmitter
 local espHighlight
 local lastCameraCFrame = Camera.CFrame
+local skyParticleFolder = nil
+local wingsModel = nil
+local hatModel = nil
 
 local themeElements = {}
 local function registerThemeElement(obj, prop)
@@ -55,6 +61,16 @@ local function updateTheme()
     end
     if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
     if espHighlight then espHighlight.FillColor = accent end
+    if settings.fogEnabled then
+        Lighting.FogColor = accent
+    end
+    if wingsModel then
+        for _, p in ipairs(wingsModel:GetDescendants()) do
+            if p:IsA("BasePart") then
+                p.Color = settings.wingsColor
+            end
+        end
+    end
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -96,7 +112,7 @@ Logo.TextSize = 22
 Logo.Font = Enum.Font.GothamBold
 registerThemeElement(Logo, "text")
 
-local categories = {"Визуал", "Темы"}
+local categories = {"Визуал", "Косметика", "Темы"}
 local catButtons = {}
 local catY = 110
 
@@ -145,7 +161,6 @@ local cardLayout = Instance.new("UIGridLayout", CardContainer)
 cardLayout.CellSize = UDim2.new(0.48, 0, 0, 60)
 cardLayout.CellPadding = UDim2.new(0.02, 0, 0, 10)
 
--- Настройки (сохраняются)
 local function openSettings(title, min, max, default, callback)
     local SettingsFrame = Instance.new("Frame", ScreenGui)
     SettingsFrame.Size = UDim2.new(0, 300, 0, 150)
@@ -225,7 +240,7 @@ local function openSettings(title, min, max, default, callback)
             knob.Position = UDim2.new(pos, -8, 0, 0)
             local val = min + pos * (max - min)
             valueLabel.Text = "Значение: " .. string.format("%.2f", val)
-            callback(val) -- сразу применяем и сохраняем
+            callback(val)
         end
     end
     slider.InputBegan:Connect(function(input)
@@ -339,6 +354,7 @@ local function createCards(list)
     end
 end
 
+-- ФУНКЦИИ ВИЗУАЛ
 local fovFunc = {
     name = "FOV",
     desc = "Меняет поле зрения.",
@@ -368,6 +384,7 @@ local stretchFunc = {
     callback = function(on) settings.stretchEnabled = on end
 }
 
+-- Партиклы (сохраняются, не сбрасываются)
 local particlesFunc = {
     name = "Партиклы",
     desc = "Частицы при ходьбе.",
@@ -395,6 +412,66 @@ local particlesFunc = {
         else
             if particleEmitter then particleEmitter:Destroy() particleEmitter = nil end
             if particleAttachment then particleAttachment:Destroy() particleAttachment = nil end
+        end
+    end
+}
+
+-- Партиклы в небе (ромбики)
+local skyParticlesFunc = {
+    name = "Партиклы неба",
+    desc = "Ромбики в небе.",
+    getState = function() return settings.skyParticlesEnabled end,
+    callback = function(on)
+        settings.skyParticlesEnabled = on
+        if on then
+            if skyParticleFolder then skyParticleFolder:Destroy() end
+            skyParticleFolder = Instance.new("Folder")
+            skyParticleFolder.Name = "KimikoSkyParticles"
+            skyParticleFolder.Parent = workspace
+            task.spawn(function()
+                while settings.skyParticlesEnabled do
+                    local char = Player.Character
+                    if char then
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            for i = 1, 3 do
+                                local diamond = Instance.new("Part")
+                                diamond.Size = Vector3.new(0.5, 0.5, 0.5)
+                                diamond.CFrame = CFrame.new(
+                                    hrp.Position + Vector3.new(
+                                        math.random(-30, 30),
+                                        math.random(15, 40),
+                                        math.random(-30, 30)
+                                    )
+                                )
+                                diamond.Anchored = true
+                                diamond.CanCollide = false
+                                diamond.Material = Enum.Material.Neon
+                                diamond.Color = getAccentColor()
+                                diamond.Transparency = 0.3
+                                diamond.Parent = skyParticleFolder
+
+                                local tween = TweenService:Create(diamond, TweenInfo.new(1.5, Enum.EasingStyle.Linear), {
+                                    Position = diamond.Position + Vector3.new(0, -10, 0),
+                                    Transparency = 1
+                                })
+                                tween:Play()
+                                tween.Completed:Connect(function() diamond:Destroy() end)
+                            end
+                        end
+                    end
+                    task.wait(0.3)
+                end
+                if skyParticleFolder then
+                    skyParticleFolder:Destroy()
+                    skyParticleFolder = nil
+                end
+            end)
+        else
+            if skyParticleFolder then
+                skyParticleFolder:Destroy()
+                skyParticleFolder = nil
+            end
         end
     end
 }
@@ -477,7 +554,6 @@ local circleFunc = {
     callback = function(on) settings.landingCircleEnabled = on end
 }
 
--- Motion Blur (только при движении камеры)
 local blurFunc = {
     name = "Motion Blur",
     desc = "Размытие при движении камеры.",
@@ -496,10 +572,8 @@ local blurFunc = {
     end
 }
 
--- Постоянный loop: реагирует на движение камеры
 RunService.RenderStepped:Connect(function()
     if not settings.motionBlurEnabled then return end
-
     local current = Camera.CFrame
     local delta = (current.Position - lastCameraCFrame.Position).Magnitude
     local rotDelta = (current.LookVector - lastCameraCFrame.LookVector).Magnitude
@@ -511,15 +585,13 @@ RunService.RenderStepped:Connect(function()
         blur.Name = "KimikoBlur"
         blur.Parent = Lighting
     end
-    -- Слабое размытие, только при движении
     blur.Size = math.clamp(movement * settings.motionBlurAmount * 20, 0, settings.motionBlurAmount)
-
     lastCameraCFrame = current
 end)
 
 local fogFunc = {
     name = "Туман",
-    desc = "Регулируемый туман.",
+    desc = "Туман под цвет темы.",
     getState = function() return settings.fogEnabled end,
     settings = function()
         openSettings("Дальность тумана", 50, 1000, settings.fogEnd, function(v)
@@ -535,7 +607,7 @@ local fogFunc = {
         if on then
             Lighting.FogEnd = settings.fogEnd
             Lighting.FogStart = settings.fogStart
-            Lighting.FogColor = Color3.fromRGB(150, 150, 200)
+            Lighting.FogColor = getAccentColor() -- цвет под тему
         else
             Lighting.FogEnd = 100000
             Lighting.FogStart = 0
@@ -564,6 +636,112 @@ local skyShaderFunc = {
         else
             local sky = Lighting:FindFirstChild("KimikoSky")
             if sky then sky:Destroy() end
+        end
+    end
+}
+
+-- КОСМЕТИКА
+local wingsFunc = {
+    name = "Крылья",
+    desc = "Анимированные крылья.",
+    getState = function() return settings.wingsEnabled end,
+    settings = function()
+        openSettings("Цвет крыльев (HUE)", 0, 360, 270, function(v)
+            settings.wingsColor = Color3.fromHSV(v/360, 0.8, 1)
+            if wingsModel then
+                for _, p in ipairs(wingsModel:GetDescendants()) do
+                    if p:IsA("BasePart") then
+                        p.Color = settings.wingsColor
+                    end
+                end
+            end
+        end)
+    end,
+    callback = function(on)
+        settings.wingsEnabled = on
+        if on then
+            local char = Player.Character
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp and not wingsModel then
+                    wingsModel = Instance.new("Model")
+                    wingsModel.Name = "KimikoWings"
+                    wingsModel.Parent = char
+
+                    for i = 1, 6 do
+                        local wing = Instance.new("Part")
+                        wing.Size = Vector3.new(0.2, 1.5, 0.5)
+                        wing.Anchored = false
+                        wing.CanCollide = false
+                        wing.Material = Enum.Material.Neon
+                        wing.Color = settings.wingsColor
+                        wing.Transparency = 0.3
+                        wing.Parent = wingsModel
+
+                        local weld = Instance.new("Weld")
+                        weld.Part0 = hrp
+                        weld.Part1 = wing
+                        weld.C0 = CFrame.new(0, 0, 0.5) * CFrame.Angles(0, math.rad(i * 15), 0)
+                        weld.Parent = wing
+                    end
+                    -- Анимация
+                    RunService.Heartbeat:Connect(function()
+                        if wingsModel and settings.wingsEnabled then
+                            for _, p in ipairs(wingsModel:GetDescendants()) do
+                                if p:IsA("BasePart") then
+                                    p.CFrame = p.CFrame * CFrame.Angles(0, 0.1, 0)
+                                end
+                            end
+                        end
+                    end)
+                end
+            end
+        else
+            if wingsModel then
+                wingsModel:Destroy()
+                wingsModel = nil
+            end
+        end
+    end
+}
+
+local hatFunc = {
+    name = "Китайская шляпа",
+    desc = "Надевает шляпу.",
+    getState = function() return settings.hatEnabled end,
+    callback = function(on)
+        settings.hatEnabled = on
+        if on then
+            local char = Player.Character
+            if char then
+                local head = char:FindFirstChild("Head")
+                if head and not hatModel then
+                    hatModel = Instance.new("Model")
+                    hatModel.Name = "KimikoHat"
+                    hatModel.Parent = char
+
+                    local cone = Instance.new("Part")
+                    cone.Shape = Enum.PartType.Cylinder
+                    cone.Size = Vector3.new(0.5, 2, 2)
+                    cone.Anchored = false
+                    cone.CanCollide = false
+                    cone.Material = Enum.Material.Wood
+                    cone.Color = Color3.fromRGB(200, 160, 100)
+                    cone.CFrame = head.CFrame * CFrame.new(0, 1.5, 0) * CFrame.Angles(0, 0, math.rad(90))
+                    cone.Parent = hatModel
+
+                    local weld = Instance.new("Weld")
+                    weld.Part0 = head
+                    weld.Part1 = cone
+                    weld.C0 = CFrame.new(0, 1.5, 0) * CFrame.Angles(0, 0, math.rad(90))
+                    weld.Parent = cone
+                end
+            end
+        else
+            if hatModel then
+                hatModel:Destroy()
+                hatModel = nil
+            end
         end
     end
 }
@@ -613,6 +791,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- Темы (добавлена белая)
 local baseThemes = {
     {name = "Фиолетовая", hue = 270},
     {name = "Синяя", hue = 220},
@@ -620,7 +799,8 @@ local baseThemes = {
     {name = "Зелёная", hue = 120},
     {name = "Розовая", hue = 320},
     {name = "Голубая", hue = 190},
-    {name = "Жёлтая", hue = 50}
+    {name = "Жёлтая", hue = 50},
+    {name = "Белая", hue = 0, custom = Color3.fromRGB(240, 240, 240)}
 }
 
 local function showThemes()
@@ -630,7 +810,7 @@ local function showThemes()
     SectionTitle.Text = "Темы"
     for i, t in ipairs(baseThemes) do
         local card = Instance.new("Frame", CardContainer)
-        card.BackgroundColor3 = Color3.fromHSV(t.hue / 360, 0.6, 0.15)
+        card.BackgroundColor3 = t.custom or Color3.fromHSV(t.hue / 360, 0.6, 0.15)
         card.BackgroundTransparency = 0.3
         card.BorderSizePixel = 0
         local cc = Instance.new("UICorner", card)
@@ -648,8 +828,22 @@ local function showThemes()
         btn.BackgroundTransparency = 1
         btn.Text = ""
         btn.MouseButton1Click:Connect(function()
-            themeHue = t.hue
-            updateTheme()
+            if t.custom then
+                -- Белая тема — вручную
+                themeHue = 0
+                for _, item in ipairs(themeElements) do
+                    if item.obj and item.obj.Parent then
+                        if item.prop == "bg" then item.obj.BackgroundColor3 = t.custom
+                        elseif item.prop == "accent" then item.obj.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+                        elseif item.prop == "text" then item.obj.TextColor3 = Color3.fromRGB(30, 30, 30)
+                        elseif item.prop == "stroke" then item.obj.Color = Color3.fromRGB(200, 200, 200)
+                        end
+                    end
+                end
+            else
+                themeHue = t.hue
+                updateTheme()
+            end
         end)
     end
 
@@ -733,10 +927,15 @@ end
 
 catButtons[1].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Визуал"
-    createCards({fovFunc, stretchFunc, particlesFunc, targetFunc, circleFunc, blurFunc, fogFunc, skyShaderFunc})
+    createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, targetFunc, circleFunc, blurFunc, fogFunc, skyShaderFunc})
 end)
 
 catButtons[2].MouseButton1Click:Connect(function()
+    SectionTitle.Text = "Косметика"
+    createCards({wingsFunc, hatFunc})
+end)
+
+catButtons[3].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
