@@ -1,4 +1,4 @@
--- Monvisual GUI
+-- Monvisual GUI (со скроллом и обводкой кнопки)
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -96,9 +96,7 @@ end
 
 -- ================== ФУНКЦИИ ==================
 local function ApplyStretch()
-    if settings.stretchEnabled then
-        Camera.CFrame = Camera.CFrame * stretchCFrame
-    end
+    if settings.stretchEnabled then Camera.CFrame = Camera.CFrame * stretchCFrame end
 end
 
 local function ApplyFOV()
@@ -322,16 +320,13 @@ local function ApplyHat()
     weld2.Parent = top
 end
 
--- УЛУЧШЕННЫЙ RTX (реалистичные тени через Atmosphere + эффекты)
 local function ApplyRTX()
-    -- Тени
     if settings.rtxShadowsEnabled then
         Lighting.GlobalShadows = true
         Lighting.ShadowSoftness = 1 - settings.rtxShadowsIntensity
         Lighting.Brightness = 2.5
         Lighting.OutdoorAmbient = Color3.fromRGB(90, 90, 110)
         Lighting.Ambient = Color3.fromRGB(60, 60, 80)
-        -- Атмосфера для реалистичности
         local atmo = Lighting:FindFirstChild("MonvisualAtmo")
         if not atmo then
             atmo = Instance.new("Atmosphere")
@@ -344,7 +339,6 @@ local function ApplyRTX()
             atmo.Haze = 1.5
             atmo.Parent = Lighting
         end
-        -- Sun rays
         local sun = Lighting:FindFirstChild("MonvisualSun")
         if not sun then
             sun = Instance.new("SunRaysEffect")
@@ -362,7 +356,6 @@ local function ApplyRTX()
         local sun = Lighting:FindFirstChild("MonvisualSun")
         if sun then sun:Destroy() end
     end
-    -- Отражения
     if settings.rtxReflectionsEnabled then
         Lighting.EnvironmentDiffuseScale = 1
         Lighting.EnvironmentSpecularScale = 1
@@ -370,7 +363,6 @@ local function ApplyRTX()
         Lighting.EnvironmentDiffuseScale = 0
         Lighting.EnvironmentSpecularScale = 0
     end
-    -- Ambient Occlusion
     if settings.rtxAOEnabled then
         local ao = Lighting:FindFirstChild("MonvisualAO")
         if not ao then
@@ -387,10 +379,9 @@ local function ApplyRTX()
     end
 end
 
--- НОЧЬ / ДЕНЬ
 local function ApplyDayNight()
     if settings.dayNightEnabled then
-        Lighting.ClockTime = settings.dayNightTime -- 0 = ночь, 12 = день
+        Lighting.ClockTime = settings.dayNightTime
         Lighting.Brightness = (settings.dayNightTime >= 6 and settings.dayNightTime <= 18) and 2 or 0.5
         Lighting.OutdoorAmbient = (settings.dayNightTime >= 6 and settings.dayNightTime <= 18) and Color3.fromRGB(120,120,140) or Color3.fromRGB(30,30,50)
     else
@@ -408,28 +399,18 @@ local function ApplyMotionBlur()
 end
 
 local function ApplyAllFunctions()
-    ApplyFOV()
-    ApplyFog()
-    ApplySky()
-    ApplySkyParticles()
-    ApplyTrails()
-    ApplyRTX()
-    ApplyDayNight()
-    ApplyMotionBlur()
+    ApplyFOV() ApplyFog() ApplySky() ApplySkyParticles() ApplyTrails()
+    ApplyRTX() ApplyDayNight() ApplyMotionBlur()
     task.spawn(function()
         task.wait(1)
-        ApplyParticles()
-        ApplyWings()
-        ApplyHat()
+        ApplyParticles() ApplyWings() ApplyHat()
     end)
 end
 task.spawn(ApplyAllFunctions)
 
 Player.CharacterAdded:Connect(function()
     task.wait(1)
-    ApplyParticles()
-    ApplyWings()
-    ApplyHat()
+    ApplyParticles() ApplyWings() ApplyHat()
 end)
 
 -- ================== GUI ==================
@@ -463,7 +444,6 @@ local sideCorner = Instance.new("UICorner", SideBar)
 sideCorner.CornerRadius = UDim.new(0, 18)
 registerThemeElement(SideBar, "bg")
 
--- Логотип с обводкой (без ⛧)
 local Logo = Instance.new("TextLabel", SideBar)
 Logo.Size = UDim2.new(1, 0, 0, 70)
 Logo.BackgroundTransparency = 1
@@ -523,14 +503,30 @@ SectionTitle.Font = Enum.Font.GothamBold
 SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
 registerThemeElement(SectionTitle, "text")
 
-local CardContainer = Instance.new("Frame", Content)
+-- СКРОЛЛ (функции не выходят за пределы)
+local CardContainer = Instance.new("ScrollingFrame", Content)
 CardContainer.Size = UDim2.new(1, 0, 1, -40)
 CardContainer.Position = UDim2.new(0, 0, 0, 40)
 CardContainer.BackgroundTransparency = 1
+CardContainer.BorderSizePixel = 0
+CardContainer.ScrollBarThickness = 4
+CardContainer.ScrollBarImageColor3 = getAccentColor()
+CardContainer.ScrollBarImageTransparency = 0.5
+CardContainer.CanvasSize = UDim2.new(0, 0, 0, 0) -- авто
 
 local cardLayout = Instance.new("UIGridLayout", CardContainer)
 cardLayout.CellSize = UDim2.new(0.48, 0, 0, 60)
 cardLayout.CellPadding = UDim2.new(0.02, 0, 0, 10)
+
+-- Автообновление CanvasSize
+CardContainer.ChildAdded:Connect(function()
+    task.wait()
+    CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
+end)
+CardContainer.ChildRemoved:Connect(function()
+    task.wait()
+    CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
+end)
 
 local function openSettings(title, min, max, default, callback)
     local existing = ScreenGui:FindFirstChild("Settings_" .. title)
@@ -726,6 +722,8 @@ local function createCards(list)
         end)
         registerThemeElement(toggle, "accent")
     end
+    task.wait()
+    CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
 -- ФУНКЦИИ
@@ -733,9 +731,7 @@ local fovFunc = {
     name = "FOV", desc = "Меняет поле зрения.",
     getState = function() return settings.fovEnabled end,
     settings = function()
-        openSettings("FOV", 30, 120, settings.fovValue, function(v)
-            settings.fovValue = v ApplyFOV()
-        end)
+        openSettings("FOV", 30, 120, settings.fovValue, function(v) settings.fovValue = v ApplyFOV() end)
     end,
     callback = function(on) settings.fovEnabled = on ApplyFOV() end
 }
@@ -846,9 +842,7 @@ local fogFunc = {
     name = "Туман", desc = "Туман под цвет темы.",
     getState = function() return settings.fogEnabled end,
     settings = function()
-        openSettings("Дальность тумана", 50, 1000, settings.fogEnd, function(v)
-            settings.fogEnd = v ApplyFog()
-        end)
+        openSettings("Дальность тумана", 50, 1000, settings.fogEnd, function(v) settings.fogEnd = v ApplyFog() end)
     end,
     callback = function(on) settings.fogEnabled = on ApplyFog() end
 }
@@ -859,30 +853,22 @@ local skyShaderFunc = {
     callback = function(on) settings.skyShaderEnabled = on ApplySky() end
 }
 
--- НОЧЬ / ДЕНЬ (переключатель)
 local dayNightFunc = {
     name = "Ночь / День", desc = "Переключить время суток.",
     getState = function() return settings.dayNightEnabled end,
     settings = function()
         openSettings("Время (0-24)", 0, 24, settings.dayNightTime, function(v)
-            settings.dayNightTime = v
-            ApplyDayNight()
+            settings.dayNightTime = v ApplyDayNight()
         end)
     end,
-    callback = function(on)
-        settings.dayNightEnabled = on
-        ApplyDayNight()
-    end
+    callback = function(on) settings.dayNightEnabled = on ApplyDayNight() end
 }
 
--- RTX ШЕЙДЕРЫ
 local rtxShadowsFunc = {
     name = "RTX Тени", desc = "Реалистичные тени + атмосфера.",
     getState = function() return settings.rtxShadowsEnabled end,
     settings = function()
-        openSettings("Сила теней", 0.1, 1, settings.rtxShadowsIntensity, function(v)
-            settings.rtxShadowsIntensity = v ApplyRTX()
-        end)
+        openSettings("Сила теней", 0.1, 1, settings.rtxShadowsIntensity, function(v) settings.rtxShadowsIntensity = v ApplyRTX() end)
     end,
     callback = function(on) settings.rtxShadowsEnabled = on ApplyRTX() end
 }
@@ -897,9 +883,7 @@ local rtxAOFunc = {
     name = "RTX AO", desc = "Затенение окружения.",
     getState = function() return settings.rtxAOEnabled end,
     settings = function()
-        openSettings("Сила AO", 0.1, 1, settings.rtxAOIntensity, function(v)
-            settings.rtxAOIntensity = v ApplyRTX()
-        end)
+        openSettings("Сила AO", 0.1, 1, settings.rtxAOIntensity, function(v) settings.rtxAOIntensity = v ApplyRTX() end)
     end,
     callback = function(on) settings.rtxAOEnabled = on ApplyRTX() end
 }
@@ -936,7 +920,6 @@ local hatFunc = {
     callback = function(on) settings.hatEnabled = on ApplyHat() end
 }
 
--- Постоянные лупы
 RunService.Heartbeat:Connect(function()
     if not settings.particlesEnabled or not particleEmitter then return end
     local char = Player.Character
@@ -1133,6 +1116,8 @@ local function showThemes()
             updateFromInput(input)
         end
     end)
+    task.wait()
+    CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
 catButtons[1].MouseButton1Click:Connect(function()
@@ -1154,8 +1139,9 @@ catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
+-- ОБВЕДЁННЫЙ ВХОД В МЕНЮ
 local OpenBtn = Instance.new("TextButton", ScreenGui)
-OpenBtn.Size = UDim2.new(0, 200, 0, 45)
+OpenBtn.Size = UDim2.new(0, 200, 0, 50)
 OpenBtn.Position = UDim2.new(0.5, -100, 0.03, 0)
 OpenBtn.BackgroundColor3 = getThemeColor()
 OpenBtn.BackgroundTransparency = transparency
@@ -1165,15 +1151,23 @@ OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0
 OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: 0"
 local oc = Instance.new("UICorner", OpenBtn)
-oc.CornerRadius = UDim.new(0, 10)
+oc.CornerRadius = UDim.new(0, 12)
+
+-- Обводка кнопки (жирная, акцентная)
+local OpenStroke = Instance.new("UIStroke", OpenBtn)
+OpenStroke.Color = getAccentColor()
+OpenStroke.Thickness = 3
+OpenStroke.Transparency = 0
+registerThemeElement(OpenStroke, "stroke")
+
+-- Внутренняя тонкая обводка (чёрная для контраста)
+local OpenStroke2 = Instance.new("UIStroke", OpenBtn)
+OpenStroke2.Color = Color3.fromRGB(0, 0, 0)
+OpenStroke2.Thickness = 1
+OpenStroke2.Transparency = 0.3
+
 registerThemeElement(OpenBtn, "bg")
 registerThemeElement(OpenBtn, "text")
-
--- Обводка на кнопке
-local OpenStroke = Instance.new("UIStroke", OpenBtn)
-OpenStroke.Color = Color3.fromRGB(0, 0, 0)
-OpenStroke.Thickness = 2
-OpenStroke.Transparency = 0.2
 
 RunService.Heartbeat:Connect(function()
     local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
