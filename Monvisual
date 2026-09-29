@@ -1,4 +1,4 @@
--- Monvisual GUI (с сохранением настроек)
+-- Monvisual GUI
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -14,7 +14,6 @@ local function getThemeColor() return Color3.fromHSV(themeHue / 360, 0.6, 0.15) 
 local function getAccentColor() return Color3.fromHSV(themeHue / 360, 0.7, 0.9) end
 local transparency = 0.3
 
--- Настройки (всё, что сохраняется)
 local settings = {
     stretchEnabled = false, STRETCH_FACTOR = 0.75,
     fovEnabled = false, fovValue = 90,
@@ -31,64 +30,27 @@ local settings = {
     themeHue = 270
 }
 
--- Сохранение
 local CONFIG_FILE = "Monvisual_config.json"
 local function SaveConfig()
     local data = {}
     for k, v in pairs(settings) do
-        if typeof(v) == "Color3" then
-            data[k] = {v.R, v.G, v.B}
-        else
-            data[k] = v
-        end
+        if typeof(v) == "Color3" then data[k] = {v.R, v.G, v.B}
+        else data[k] = v end
     end
     data.themeHue = themeHue
-    pcall(function()
-        writefile(CONFIG_FILE, HttpService:JSONEncode(data))
-    end)
+    pcall(function() writefile(CONFIG_FILE, HttpService:JSONEncode(data)) end)
 end
-
 local function LoadConfig()
     if not isfile(CONFIG_FILE) then return end
     local ok, data = pcall(function() return HttpService:JSONDecode(readfile(CONFIG_FILE)) end)
     if not ok or not data then return end
     for k, v in pairs(data) do
-        if k == "themeHue" then
-            themeHue = v
-        elseif k == "wingsColor" or k == "hatColor" then
-            settings[k] = Color3.new(v[1], v[2], v[3])
-        elseif settings[k] ~= nil then
-            settings[k] = v
-        end
+        if k == "themeHue" then themeHue = v
+        elseif k == "wingsColor" or k == "hatColor" then settings[k] = Color3.new(v[1], v[2], v[3])
+        elseif settings[k] ~= nil then settings[k] = v end
     end
 end
-
 LoadConfig()
-
--- Применяем сохранённые функции при запуске
-local function ApplySavedSettings()
-    if settings.fovEnabled then Camera.FieldOfView = settings.fovValue end
-    if settings.fogEnabled then
-        Lighting.FogEnd = settings.fogEnd
-        Lighting.FogStart = settings.fogStart
-        Lighting.FogColor = getAccentColor()
-    end
-    if settings.skyShaderEnabled then
-        local existing = Lighting:FindFirstChild("MonvisualSky")
-        if existing then existing:Destroy() end
-        local sky = Instance.new("Sky")
-        sky.Name = "MonvisualSky"
-        sky.SkyboxBk = "rbxassetid://105721322908215"
-        sky.SkyboxDn = "rbxassetid://105721322908215"
-        sky.SkyboxFt = "rbxassetid://105721322908215"
-        sky.SkyboxLf = "rbxassetid://105721322908215"
-        sky.SkyboxRt = "rbxassetid://105721322908215"
-        sky.SkyboxUp = "rbxassetid://105721322908215"
-        sky.Parent = Lighting
-    end
-end
-
-task.spawn(ApplySavedSettings)
 
 local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
 local particleAttachment, particleEmitter
@@ -132,6 +94,29 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Monvisual"
 ScreenGui.ResetOnSpawn = false
 pcall(function() ScreenGui.Parent = game.CoreGui end)
+
+local function ApplySavedSettings()
+    if settings.fovEnabled then Camera.FieldOfView = settings.fovValue end
+    if settings.fogEnabled then
+        Lighting.FogEnd = settings.fogEnd
+        Lighting.FogStart = settings.fogStart
+        Lighting.FogColor = getAccentColor()
+    end
+    if settings.skyShaderEnabled then
+        local existing = Lighting:FindFirstChild("MonvisualSky")
+        if existing then existing:Destroy() end
+        local sky = Instance.new("Sky")
+        sky.Name = "MonvisualSky"
+        sky.SkyboxBk = "rbxassetid://105721322908215"
+        sky.SkyboxDn = "rbxassetid://105721322908215"
+        sky.SkyboxFt = "rbxassetid://105721322908215"
+        sky.SkyboxLf = "rbxassetid://105721322908215"
+        sky.SkyboxRt = "rbxassetid://105721322908215"
+        sky.SkyboxUp = "rbxassetid://105721322908215"
+        sky.Parent = Lighting
+    end
+end
+task.spawn(ApplySavedSettings)
 
 -- Меню
 local Main = Instance.new("Frame", ScreenGui)
@@ -224,14 +209,13 @@ cardLayout.CellSize = UDim2.new(0.48, 0, 0, 60)
 cardLayout.CellPadding = UDim2.new(0.02, 0, 0, 10)
 
 local function openSettings(title, min, max, default, callback)
-    -- Если окно с таким названием уже открыто — закрываем
     local existing = ScreenGui:FindFirstChild("Settings_" .. title)
     if existing then existing:Destroy() return end
 
     local SettingsFrame = Instance.new("Frame", ScreenGui)
     SettingsFrame.Name = "Settings_" .. title
-    SettingsFrame.Size = UDim2.new(0, 300, 0, 130)
-    SettingsFrame.Position = UDim2.new(0.5, -150, 0.5, -65)
+    SettingsFrame.Size = UDim2.new(0, 300, 0, 150)
+    SettingsFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
     SettingsFrame.BackgroundColor3 = getThemeColor()
     SettingsFrame.BackgroundTransparency = 0.1
     SettingsFrame.BorderSizePixel = 0
@@ -251,7 +235,7 @@ local function openSettings(title, min, max, default, callback)
 
     local slider = Instance.new("TextButton", SettingsFrame)
     slider.Size = UDim2.new(0.8, 0, 0, 20)
-    slider.Position = UDim2.new(0.1, 0, 0.35, 0)
+    slider.Position = UDim2.new(0.1, 0, 0.4, 0)
     slider.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
     slider.Text = ""
     slider.BorderSizePixel = 0
@@ -277,12 +261,23 @@ local function openSettings(title, min, max, default, callback)
 
     local valueLabel = Instance.new("TextLabel", SettingsFrame)
     valueLabel.Size = UDim2.new(1, 0, 0, 20)
-    valueLabel.Position = UDim2.new(0, 0, 0.6, 0)
+    valueLabel.Position = UDim2.new(0, 0, 0.65, 0)
     valueLabel.BackgroundTransparency = 1
     valueLabel.Text = "Значение: " .. string.format("%.2f", default)
     valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     valueLabel.TextSize = 13
     valueLabel.Font = Enum.Font.Gotham
+
+    -- Крестик вернулся
+    local closeBtn = Instance.new("TextButton", SettingsFrame)
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 2)
+    closeBtn.BackgroundTransparency = 1
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+    closeBtn.TextSize = 18
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.MouseButton1Click:Connect(function() SettingsFrame:Destroy() end)
 
     local dragging = false
     local function updateFromInput(input)
@@ -518,9 +513,7 @@ local trailsFunc = {
     name = "Movement Trails", desc = "Шлейф за игроком.",
     getState = function() return settings.trailsEnabled end,
     settings = function()
-        openSettings("Прозрачность", 0.1, 1, settings.trailsTransparency, function(v)
-            settings.trailsTransparency = v
-        end)
+        openSettings("Прозрачность", 0.1, 1, settings.trailsTransparency, function(v) settings.trailsTransparency = v end)
     end,
     callback = function(on)
         settings.trailsEnabled = on
@@ -538,9 +531,8 @@ local trailsFunc = {
                 if not hrp then return end
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 if not hum or hum.MoveDirection.Magnitude < 0.1 then return end
-
                 local trail = Instance.new("Part")
-                trail.Size = Vector3.new(0.5, 3, 0.5) -- тоньше и выше
+                trail.Size = Vector3.new(0.5, 3, 0.5)
                 trail.CFrame = hrp.CFrame
                 trail.Anchored = true
                 trail.CanCollide = false
@@ -675,7 +667,6 @@ local fogFunc = {
     end
 }
 
--- ИСПРАВЛЕННЫЙ ШЕЙДЕР СКАЙ
 local skyShaderFunc = {
     name = "Шейдер Скай", desc = "Меняет небо.",
     getState = function() return settings.skyShaderEnabled end,
@@ -700,7 +691,6 @@ local skyShaderFunc = {
     end
 }
 
--- КОСМЕТИКА
 local wingsFunc = {
     name = "Крылья", desc = "Анимированные крылья.",
     getState = function() return settings.wingsEnabled end,
@@ -746,8 +736,7 @@ local wingsFunc = {
                         wing.CanCollide = false
                         wing.Material = Enum.Material.Neon
                         wing.Color = settings.wingsColor
-                        wing.Transparency = 0.3
-                        wing.Parent = wingsModel
+                        wing.Transparency = 0.3                        wing.Parent = wingsModel
                         local weld = Instance.new("Weld")
                         weld.Part0 = hrp
                         weld.Part1 = wing
@@ -803,7 +792,6 @@ local hatFunc = {
                     hatModel = Instance.new("Model")
                     hatModel.Name = "MonvisualHat"
                     hatModel.Parent = char
-
                     local cone = Instance.new("Part")
                     cone.Shape = Enum.PartType.Cylinder
                     cone.Size = Vector3.new(1.2, 2.5, 2.5)
@@ -817,7 +805,6 @@ local hatFunc = {
                     weld.Part1 = cone
                     weld.C0 = CFrame.new(0, 1.3, 0) * CFrame.Angles(0, 0, math.rad(90))
                     weld.Parent = cone
-
                     local top = Instance.new("Part")
                     top.Shape = Enum.PartType.Cylinder
                     top.Size = Vector3.new(0.5, 0.6, 0.6)
@@ -1031,26 +1018,32 @@ catButtons[3].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
+-- Кнопка открытия с ником и пингом
 local OpenBtn = Instance.new("TextButton", ScreenGui)
-OpenBtn.Size = UDim2.new(0, 130, 0, 40)
-OpenBtn.Position = UDim2.new(0.5, -65, 0.03, 0)
+OpenBtn.Size = UDim2.new(0, 200, 0, 45)
+OpenBtn.Position = UDim2.new(0.5, -100, 0.03, 0)
 OpenBtn.BackgroundColor3 = getThemeColor()
 OpenBtn.BackgroundTransparency = transparency
 OpenBtn.TextColor3 = getAccentColor()
-OpenBtn.Text = "⛧ MONVISUAL"
-OpenBtn.TextSize = 16
+OpenBtn.TextSize = 14
 OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0
+OpenBtn.Text = "⛧ MONVISUAL\n" .. Player.Name .. " | Ping: 0"
 local oc = Instance.new("UICorner", OpenBtn)
 oc.CornerRadius = UDim.new(0, 10)
 registerThemeElement(OpenBtn, "bg")
 registerThemeElement(OpenBtn, "text")
 
+-- Обновляем ник и пинг на кнопке
+RunService.Heartbeat:Connect(function()
+    local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+    OpenBtn.Text = "⛧ MONVISUAL\n" .. Player.Name .. " | Ping: " .. ping
+end)
+
 OpenBtn.MouseButton1Click:Connect(function()
     Main.Visible = not Main.Visible
 end)
 
--- Применяем сохранённую тему
 updateTheme()
 
 catButtons[1].MouseButton1Click:Fire()
