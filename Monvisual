@@ -1,4 +1,10 @@
--- Monvisual GUI (Final + Right Shift)
+-- Monvisual GUI (Fix menu + closer ESP)
+if _G.Monvisual_Loaded then
+    pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
+    _G.Monvisual_Loaded = false
+end
+_G.Monvisual_Loaded = true
+
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -74,7 +80,7 @@ local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,
 local particleAttachment, particleEmitter
 local espDiamonds = {}
 local espAngle = 0
-local espTargetCFrame = nil -- для плавного наведения
+local espTargetCFrame = nil
 local lastCameraCFrame = Camera.CFrame
 local skyParticleFolder, wingsModel, wingsCon, hatModel, trailFolder, trailCon
 
@@ -417,6 +423,7 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Monvisual"
 ScreenGui.ResetOnSpawn = false
 pcall(function() ScreenGui.Parent = game.CoreGui end)
+_G.Monvisual_ScreenGui = ScreenGui
 
 local Main = Instance.new("Frame", ScreenGui)
 Main.Size = UDim2.new(0, 700, 0, 420)
@@ -746,7 +753,7 @@ local trailsFunc = {name = "Movement Trails", desc = "Шлейф за игрок
     settings = function() openSettings("Прозрачность", 0.1, 1, settings.trailsTransparency, function(v) settings.trailsTransparency = v end) end,
     callback = function(on) settings.trailsEnabled = on ApplyTrails() end}
 
-local targetFunc = {name = "Target ESP", desc = "8 ромбиков вокруг игрока (20-30м плавно).", getState = function() return settings.targetESPEnabled end,
+local targetFunc = {name = "Target ESP", desc = "8 ромбиков вокруг игрока (ближе).", getState = function() return settings.targetESPEnabled end,
     callback = function(on)
         settings.targetESPEnabled = on
         if not on then
@@ -755,7 +762,6 @@ local targetFunc = {name = "Target ESP", desc = "8 ромбиков вокруг
         end
     end}
 
--- Target ESP: плавное наведение на цель в 20-30м
 RunService.Heartbeat:Connect(function()
     if not settings.targetESPEnabled then
         for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
@@ -800,14 +806,12 @@ RunService.Heartbeat:Connect(function()
             end
             espAngle = espAngle + 0.05
             local center = targetHRP.Position
-            local radius = 4
-            -- Плавное смещение центра к цели (если в 20-30 м)
+            local radius = 2.5 -- БЛИЖЕ (было 4)
             if not espTargetCFrame then
                 espTargetCFrame = CFrame.new(center)
             else
                 local targetCF = CFrame.new(center)
                 local dist2 = (espTargetCFrame.Position - center).Magnitude
-                -- Скорость наведения зависит от расстояния
                 local alpha = dist2 > 20 and 0.02 or 0.15
                 espTargetCFrame = espTargetCFrame:Lerp(targetCF, alpha)
             end
