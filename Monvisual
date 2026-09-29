@@ -1,4 +1,4 @@
--- Monvisual GUI (Final)
+-- Monvisual GUI (Final + Right Shift)
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -74,6 +74,7 @@ local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,
 local particleAttachment, particleEmitter
 local espDiamonds = {}
 local espAngle = 0
+local espTargetCFrame = nil -- для плавного наведения
 local lastCameraCFrame = Camera.CFrame
 local skyParticleFolder, wingsModel, wingsCon, hatModel, trailFolder, trailCon
 
@@ -745,7 +746,7 @@ local trailsFunc = {name = "Movement Trails", desc = "Шлейф за игрок
     settings = function() openSettings("Прозрачность", 0.1, 1, settings.trailsTransparency, function(v) settings.trailsTransparency = v end) end,
     callback = function(on) settings.trailsEnabled = on ApplyTrails() end}
 
-local targetFunc = {name = "Target ESP", desc = "8 ромбиков вокруг игрока.", getState = function() return settings.targetESPEnabled end,
+local targetFunc = {name = "Target ESP", desc = "8 ромбиков вокруг игрока (20-30м плавно).", getState = function() return settings.targetESPEnabled end,
     callback = function(on)
         settings.targetESPEnabled = on
         if not on then
@@ -754,11 +755,12 @@ local targetFunc = {name = "Target ESP", desc = "8 ромбиков вокруг
         end
     end}
 
--- Target ESP: 8 ромбиков (0.7, дальность 30м, радиус 4)
+-- Target ESP: плавное наведение на цель в 20-30м
 RunService.Heartbeat:Connect(function()
     if not settings.targetESPEnabled then
         for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
         espDiamonds = {}
+        espTargetCFrame = nil
         return
     end
     local char = Player.Character
@@ -799,13 +801,24 @@ RunService.Heartbeat:Connect(function()
             espAngle = espAngle + 0.05
             local center = targetHRP.Position
             local radius = 4
+            -- Плавное смещение центра к цели (если в 20-30 м)
+            if not espTargetCFrame then
+                espTargetCFrame = CFrame.new(center)
+            else
+                local targetCF = CFrame.new(center)
+                local dist2 = (espTargetCFrame.Position - center).Magnitude
+                -- Скорость наведения зависит от расстояния
+                local alpha = dist2 > 20 and 0.02 or 0.15
+                espTargetCFrame = espTargetCFrame:Lerp(targetCF, alpha)
+            end
+            local smoothCenter = espTargetCFrame.Position
             for i, part in ipairs(espDiamonds) do
                 if part then
                     local angle = espAngle + (i - 1) * (math.pi * 2 / 8)
                     local x = math.cos(angle) * radius
                     local z = math.sin(angle) * radius
                     local y = math.sin(espAngle * 2 + i) * 1.5
-                    part.CFrame = CFrame.new(center + Vector3.new(x, y, z)) * CFrame.Angles(math.rad(45), espAngle, math.rad(45))
+                    part.CFrame = CFrame.new(smoothCenter + Vector3.new(x, y, z)) * CFrame.Angles(math.rad(45), espAngle, math.rad(45))
                     part.Color = getAccentColor()
                 end
             end
@@ -813,6 +826,7 @@ RunService.Heartbeat:Connect(function()
     else
         for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
         espDiamonds = {}
+        espTargetCFrame = nil
     end
 end)
 
@@ -1109,6 +1123,14 @@ end)
 
 OpenBtn.MouseButton1Click:Connect(function()
     Main.Visible = not Main.Visible
+end)
+
+-- ОТКРЫТИЕ МЕНЮ НА ПК: RIGHT SHIFT
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        Main.Visible = not Main.Visible
+    end
 end)
 
 updateTheme()
