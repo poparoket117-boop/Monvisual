@@ -115,9 +115,7 @@ local function ApplyParticles()
     if particleAttachment then pcall(function() particleAttachment:Destroy() end) particleAttachment = nil end
     if not settings.particlesEnabled then return end
     local char = Player.Character
-    if not char then
-        char = Player.CharacterAdded:Wait()
-    end
+    if not char then char = Player.CharacterAdded:Wait() end
     local hrp = char:WaitForChild("HumanoidRootPart", 5)
     if not hrp then return end
     particleAttachment = Instance.new("Attachment", hrp)
@@ -400,13 +398,9 @@ local function ApplyAllFunctions()
     ApplyFOV() ApplyFog() ApplySky() ApplySkyParticles() ApplyTrails()
     ApplyRTX() ApplyDayNight() ApplyMotionBlur()
     task.spawn(function()
-        if not Player.Character then
-            Player.CharacterAdded:Wait()
-        end
+        if not Player.Character then Player.CharacterAdded:Wait() end
         task.wait(0.5)
-        ApplyParticles()
-        ApplyWings()
-        ApplyHat()
+        ApplyParticles() ApplyWings() ApplyHat()
     end)
 end
 
@@ -414,9 +408,7 @@ task.spawn(ApplyAllFunctions)
 
 Player.CharacterAdded:Connect(function(char)
     task.wait(1)
-    ApplyParticles()
-    ApplyWings()
-    ApplyHat()
+    ApplyParticles() ApplyWings() ApplyHat()
 end)
 
 -- ================== GUI ==================
@@ -762,7 +754,7 @@ local targetFunc = {name = "Target ESP", desc = "8 ромбиков вокруг
         end
     end}
 
--- Target ESP: 8 ромбиков
+-- Target ESP: 8 ромбиков (0.7, дальность 30м, радиус 4)
 RunService.Heartbeat:Connect(function()
     if not settings.targetESPEnabled then
         for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
@@ -773,7 +765,7 @@ RunService.Heartbeat:Connect(function()
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local closest, dist = nil, 5
+    local closest, dist = nil, 30
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             local targetHRP = p.Character.HumanoidRootPart
@@ -793,7 +785,7 @@ RunService.Heartbeat:Connect(function()
                 espDiamonds = {}
                 for i = 1, 8 do
                     local part = Instance.new("Part")
-                    part.Size = Vector3.new(0.3, 0.3, 0.3)
+                    part.Size = Vector3.new(0.7, 0.7, 0.7)
                     part.Anchored = true
                     part.CanCollide = false
                     part.Material = Enum.Material.Neon
@@ -806,13 +798,13 @@ RunService.Heartbeat:Connect(function()
             end
             espAngle = espAngle + 0.05
             local center = targetHRP.Position
-            local radius = 2.5
+            local radius = 4
             for i, part in ipairs(espDiamonds) do
                 if part then
                     local angle = espAngle + (i - 1) * (math.pi * 2 / 8)
                     local x = math.cos(angle) * radius
                     local z = math.sin(angle) * radius
-                    local y = math.sin(espAngle * 2 + i) * 1
+                    local y = math.sin(espAngle * 2 + i) * 1.5
                     part.CFrame = CFrame.new(center + Vector3.new(x, y, z)) * CFrame.Angles(math.rad(45), espAngle, math.rad(45))
                     part.Color = getAccentColor()
                 end
@@ -1082,7 +1074,7 @@ catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- КНОПКА ВХОДА (тонкая обводка)
+-- Кнопка входа
 local OpenBorder = Instance.new("Frame", ScreenGui)
 OpenBorder.Size = UDim2.new(0, 204, 0, 54)
 OpenBorder.Position = UDim2.new(0.5, -102, 0.03, -2)
