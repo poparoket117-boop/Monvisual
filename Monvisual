@@ -1,4 +1,4 @@
--- Kimiko-style GUI (мгновенное обновление темы)
+-- Kimiko-style GUI (функции сохраняются, ESP 5м, без крестиков)
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -23,39 +23,26 @@ local targetESPEnabled = false
 local espHighlight = nil
 local landingCircleEnabled = false
 
--- Хранилище всех элементов, у которых нужно менять цвет
 local themeElements = {}
 local function registerThemeElement(obj, prop)
     table.insert(themeElements, {obj = obj, prop = prop})
 end
 
--- Мгновенное обновление темы
 local function updateTheme()
     local base = getThemeColor()
     local accent = getAccentColor()
     for _, item in ipairs(themeElements) do
         if item.obj and item.obj.Parent then
-            if item.prop == "bg" then
-                item.obj.BackgroundColor3 = base
-            elseif item.prop == "accent" then
-                item.obj.BackgroundColor3 = accent
-            elseif item.prop == "text" then
-                item.obj.TextColor3 = accent
-            elseif item.prop == "stroke" then
-                item.obj.Color = accent
-            elseif item.prop == "gradient" then
-                item.obj.Color = ColorSequence.new(accent)
+            if item.prop == "bg" then item.obj.BackgroundColor3 = base
+            elseif item.prop == "accent" then item.obj.BackgroundColor3 = accent
+            elseif item.prop == "text" then item.obj.TextColor3 = accent
+            elseif item.prop == "stroke" then item.obj.Color = accent
+            elseif item.prop == "gradient" then item.obj.Color = ColorSequence.new(accent)
             end
         end
     end
-    -- Обновляем цвет у партиклов, если они есть
-    if particleEmitter then
-        particleEmitter.Color = ColorSequence.new(accent)
-    end
-    -- Обновляем Highlight
-    if espHighlight then
-        espHighlight.FillColor = accent
-    end
+    if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
+    if espHighlight then espHighlight.FillColor = accent end
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -146,6 +133,8 @@ local cardLayout = Instance.new("UIGridLayout", CardContainer)
 cardLayout.CellSize = UDim2.new(0.48, 0, 0, 60)
 cardLayout.CellPadding = UDim2.new(0.02, 0, 0, 10)
 
+-- Настройки (без крестика, не закрывается при выходе из меню)
+local settingsWindows = {}
 local function openSettings(title, min, max, default, callback)
     local SettingsFrame = Instance.new("Frame", ScreenGui)
     SettingsFrame.Size = UDim2.new(0, 300, 0, 150)
@@ -157,6 +146,7 @@ local function openSettings(title, min, max, default, callback)
     local sfCorner = Instance.new("UICorner", SettingsFrame)
     sfCorner.CornerRadius = UDim.new(0, 12)
     registerThemeElement(SettingsFrame, "bg")
+    table.insert(settingsWindows, SettingsFrame)
 
     local sfTitle = Instance.new("TextLabel", SettingsFrame)
     sfTitle.Size = UDim2.new(1, 0, 0, 30)
@@ -210,7 +200,9 @@ local function openSettings(title, min, max, default, callback)
     closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     closeBtn.TextSize = 18
     closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.MouseButton1Click:Connect(function() SettingsFrame:Destroy() end)
+    closeBtn.MouseButton1Click:Connect(function()
+        SettingsFrame.Visible = false -- просто скрываем, не удаляем
+    end)
 
     local dragging = false
     local function updateFromInput(input)
@@ -315,20 +307,26 @@ local function createCards(list)
         local kc = Instance.new("UICorner", knob)
         kc.CornerRadius = UDim.new(1, 0)
 
-        local on = false
+        -- Восстанавливаем состояние при пересоздании
+        if f.getState and f.getState() then
+            toggle.BackgroundColor3 = getAccentColor()
+            knob.Position = UDim2.new(1, -14, 0.5, -6)
+        end
+
         toggle.MouseButton1Click:Connect(function()
-            on = not on
-            if on then
-                toggle.BackgroundColor3 = getAccentColor()
-                knob.Position = UDim2.new(1, -14, 0.5, -6)
-            else
-                toggle.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
-                knob.Position = UDim2.new(0, 2, 0.5, -6)
+            if f.getState then
+                local newState = not f.getState()
+                f.callback(newState)
+                if newState then
+                    toggle.BackgroundColor3 = getAccentColor()
+                    knob.Position = UDim2.new(1, -14, 0.5, -6)
+                else
+                    toggle.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
+                    knob.Position = UDim2.new(0, 2, 0.5, -6)
+                end
             end
-            if f.callback then pcall(f.callback, on) end
         end)
 
-        -- Регистрируем toggle, чтобы цвет обновлялся мгновенно
         registerThemeElement(toggle, "accent")
     end
 end
@@ -336,6 +334,7 @@ end
 local fovFunc = {
     name = "FOV",
     desc = "Меняет поле зрения.",
+    getState = function() return fovEnabled end,
     settings = function()
         openSettings("FOV", 30, 120, 90, function(v)
             fovValue = v
@@ -351,6 +350,7 @@ local fovFunc = {
 local stretchFunc = {
     name = "Растяг 4:3",
     desc = "Растягивает экран.",
+    getState = function() return stretchEnabled end,
     settings = function()
         openSettings("Растяг", 50, 100, 75, function(v)
             STRETCH_FACTOR = v / 100
@@ -363,6 +363,7 @@ local stretchFunc = {
 local particlesFunc = {
     name = "Партиклы",
     desc = "Частицы при ходьбе.",
+    getState = function() return particlesEnabled end,
     callback = function(on)
         particlesEnabled = on
         if on then
@@ -403,36 +404,66 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- Target ESP (только видимые игроки, максимум 5 метров, без стен)
 local targetFunc = {
     name = "Target ESP",
-    desc = "Подсвечивает ближайшего игрока.",
+    desc = "Подсвечивает игрока в 5 метрах.",
+    getState = function() return targetESPEnabled end,
     callback = function(on)
         targetESPEnabled = on
-        if on then
-            local closest, dist = nil, math.huge
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                    local d = (p.Character.HumanoidRootPart.Position - Camera.CFrame.Position).Magnitude
-                    if d < dist then dist = d closest = p.Character end
-                end
-            end
-            if closest and not espHighlight then
-                espHighlight = Instance.new("Highlight")
-                espHighlight.Adornee = closest
-                espHighlight.FillColor = getAccentColor()
-                espHighlight.FillTransparency = 0.5
-                espHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                espHighlight.Parent = closest
-            end
-        else
-            if espHighlight then espHighlight:Destroy() espHighlight = nil end
-        end
+        if espHighlight then espHighlight:Destroy() espHighlight = nil end
     end
 }
 
+-- Постоянное обновление ESP (проверка видимости)
+RunService.Heartbeat:Connect(function()
+    if not targetESPEnabled then
+        if espHighlight then espHighlight:Destroy() espHighlight = nil end
+        return
+    end
+    local char = Player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local closest = nil
+    local dist = 5 -- максимум 5 метров
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local targetHRP = p.Character.HumanoidRootPart
+            local d = (targetHRP.Position - hrp.Position).Magnitude
+            if d <= dist then
+                -- проверяем видимость (нет стен)
+                local ray = Ray.new(hrp.Position, (targetHRP.Position - hrp.Position).Unit * d)
+                local hit = workspace:FindPartOnRay(ray, char)
+                if not hit or hit:IsDescendantOf(p.Character) then
+                    closest = p.Character
+                    dist = d
+                end
+            end
+        end
+    end
+
+    if closest then
+        if not espHighlight or espHighlight.Adornee ~= closest then
+            if espHighlight then espHighlight:Destroy() end
+            espHighlight = Instance.new("Highlight")
+            espHighlight.Adornee = closest
+            espHighlight.FillColor = getAccentColor()
+            espHighlight.FillTransparency = 0.5
+            espHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            espHighlight.Parent = closest
+        end
+    else
+        if espHighlight then espHighlight:Destroy() espHighlight = nil end
+    end
+end)
+
 local circleFunc = {
     name = "Волна при прыжке",
-    desc = "Эффект капли при прыжке/приземлении.",
+    desc = "Эффект капли при прыжке.",
+    getState = function() return landingCircleEnabled end,
     callback = function(on) landingCircleEnabled = on end
 }
 
@@ -455,7 +486,6 @@ local function spawnRipple(pos)
             ring.Color = getAccentColor()
             ring.Transparency = 0.5
             ring.Parent = workspace
-
             local tween = TweenService:Create(ring, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = Vector3.new(0.1, 10 + i * 3, 10 + i * 3),
                 Transparency = 1
@@ -475,7 +505,6 @@ RunService.Heartbeat:Connect(function()
     if not hum then return end
     local state = hum:GetState()
     local isJumping = state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall
-
     if isJumping ~= wasJumping then
         wasJumping = isJumping
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -498,7 +527,6 @@ local function showThemes()
         if child:IsA("Frame") then child:Destroy() end
     end
     SectionTitle.Text = "Темы"
-
     for i, t in ipairs(baseThemes) do
         local card = Instance.new("Frame", CardContainer)
         card.BackgroundColor3 = Color3.fromHSV(t.hue / 360, 0.6, 0.15)
@@ -506,7 +534,6 @@ local function showThemes()
         card.BorderSizePixel = 0
         local cc = Instance.new("UICorner", card)
         cc.CornerRadius = UDim.new(0, 10)
-
         local title = Instance.new("TextLabel", card)
         title.Size = UDim2.new(1, 0, 0, 20)
         title.Position = UDim2.new(0, 0, 0.2, 0)
@@ -515,7 +542,6 @@ local function showThemes()
         title.TextColor3 = Color3.fromRGB(255, 255, 255)
         title.TextSize = 14
         title.Font = Enum.Font.GothamBold
-
         local btn = Instance.new("TextButton", card)
         btn.Size = UDim2.new(1, 0, 1, 0)
         btn.BackgroundTransparency = 1
@@ -583,7 +609,7 @@ local function showThemes()
             themeHue = math.floor(pos * 360)
             hueLabel.Text = "Свой оттенок: " .. themeHue
             knob.Position = UDim2.new(pos, -9, 0.5, -9)
-            updateTheme() -- мгновенное обновление
+            updateTheme()
         end
     end
     slider.InputBegan:Connect(function(input)
@@ -628,8 +654,10 @@ oc.CornerRadius = UDim.new(0, 10)
 registerThemeElement(OpenBtn, "bg")
 registerThemeElement(OpenBtn, "text")
 
+-- Открытие/закрытие меню (настройки НЕ закрываются)
 OpenBtn.MouseButton1Click:Connect(function()
     Main.Visible = not Main.Visible
+    -- Настройки остаются открытыми
 end)
 
 catButtons[1].MouseButton1Click:Fire()
