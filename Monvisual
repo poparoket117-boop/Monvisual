@@ -73,8 +73,8 @@ LoadConfig()
 local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
 local particleAttachment, particleEmitter
 local espHighlight
-local espCorners = {}
-local espCornerCFrame = CFrame.new(0,0,0)
+local espDiamonds = {}
+local espAngle = 0
 local lastCameraCFrame = Camera.CFrame
 local skyParticleFolder, wingsModel, wingsCon, hatModel, trailFolder, trailCon
 
@@ -100,8 +100,8 @@ local function updateTheme()
     end
     if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
     if espHighlight then espHighlight.FillColor = accent end
-    for _, c in ipairs(espCorners) do
-        if c and c.Parent then c.Color = accent end
+    for _, d in ipairs(espDiamonds) do
+        if d and d.Parent then d.Color = accent end
     end
 end
 
@@ -112,13 +112,18 @@ end
 local function ApplyFOV()
     Camera.FieldOfView = settings.fovEnabled and settings.fovValue or 70
 end
+
+-- ИСПРАВЛЕНИЕ: партиклы создаются сразу и привязываются к персонажу
 local function ApplyParticles()
     if particleEmitter then pcall(function() particleEmitter:Destroy() end) particleEmitter = nil end
     if particleAttachment then pcall(function() particleAttachment:Destroy() end) particleAttachment = nil end
     if not settings.particlesEnabled then return end
     local char = Player.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not char then
+        -- Если персонажа нет, ждём его
+        char = Player.CharacterAdded:Wait()
+    end
+    local hrp = char:WaitForChild("HumanoidRootPart", 5)
     if not hrp then return end
     particleAttachment = Instance.new("Attachment", hrp)
     particleEmitter = Instance.new("ParticleEmitter")
@@ -132,6 +137,7 @@ local function ApplyParticles()
     particleEmitter.Transparency = NumberSequence.new(0, 1)
     particleEmitter.Parent = particleAttachment
 end
+
 local function ApplyFog()
     if settings.fogEnabled then
         Lighting.FogEnd = settings.fogEnd
@@ -395,19 +401,34 @@ local function ApplyMotionBlur()
         if blur then blur:Destroy() end
     end
 end
+
+-- ИСПРАВЛЕНО: партиклы создаются сразу при загрузке и привязываются к первому персонажу
 local function ApplyAllFunctions()
     ApplyFOV() ApplyFog() ApplySky() ApplySkyParticles() ApplyTrails()
     ApplyRTX() ApplyDayNight() ApplyMotionBlur()
-    task.spawn(function()
-        local char = Player.Character or Player.CharacterAdded:Wait()
-        task.wait(0.5)
-        ApplyParticles() ApplyWings() ApplyHat()
-    end)
+    
+    -- Партиклы и косметика после загрузки персонажа
+    if settings.particlesEnabled or settings.wingsEnabled or settings.hatEnabled then
+        task.spawn(function()
+            -- Ждём первого персонажа (если он есть — сразу)
+            if not Player.Character then
+                Player.CharacterAdded:Wait()
+            end
+            task.wait(0.5)
+            ApplyParticles()
+            ApplyWings()
+            ApplyHat()
+        end)
+    end
 end
+
 task.spawn(ApplyAllFunctions)
+
 Player.CharacterAdded:Connect(function(char)
     task.wait(1)
-    ApplyParticles() ApplyWings() ApplyHat()
+    ApplyParticles()
+    ApplyWings()
+    ApplyHat()
 end)
 
 -- ================== GUI ==================
@@ -744,21 +765,20 @@ local trailsFunc = {name = "Movement Trails", desc = "Шлейф за игрок
     settings = function() openSettings("Прозрачность", 0.1, 1, settings.trailsTransparency, function(v) settings.trailsTransparency = v end) end,
     callback = function(on) settings.trailsEnabled = on ApplyTrails() end}
 
-local targetFunc = {name = "Target ESP", desc = "Уголки вокруг игрока в 5м.", getState = function() return settings.targetESPEnabled end,
+-- Target ESP — 8 ромбиков вокруг цели
+local targetFunc = {name = "Target ESP", desc = "8 ромбиков вокруг игрока.", getState = function() return settings.targetESPEnabled end,
     callback = function(on)
         settings.targetESPEnabled = on
-        if espHighlight then espHighlight:Destroy() espHighlight = nil end
         if not on then
-            for _, c in ipairs(espCorners) do if c and c.Parent then c:Destroy() end end
-            espCorners = {}
+            for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
+            espDiamonds = {}
         end
     end}
 
--- Target ESP: 4 вращающихся уголка (как рамка прицела)
 RunService.Heartbeat:Connect(function()
     if not settings.targetESPEnabled then
-        for _, c in ipairs(espCorners) do if c and c.Parent then c:Destroy() end end
-        espCorners = {}
+        for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
+        espDiamonds = {}
         return
     end
     local char = Player.Character
@@ -780,40 +800,41 @@ RunService.Heartbeat:Connect(function()
     if closest then
         local targetHRP = closest:FindFirstChild("HumanoidRootPart")
         if targetHRP then
-            if #espCorners < 4 then
-                for _, c in ipairs(espCorners) do if c and c.Parent then c:Destroy() end end
-                espCorners = {}
-                for i = 1, 4 do
+            -- Создаём 8 ромбиков
+            if #espDiamonds < 8 then
+                for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
+                espDiamonds = {}
+                for i = 1, 8 do
                     local part = Instance.new("Part")
-                    part.Size = Vector3.new(0.15, 0.6, 0.15)
+                    part.Size = Vector3.new(0.3, 0.3, 0.3)
                     part.Anchored = true
                     part.CanCollide = false
                     part.Material = Enum.Material.Neon
                     part.Color = getAccentColor()
                     part.Transparency = 0.2
+                    part.CFrame = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(45), math.rad(45), 0)
                     part.Parent = workspace
-                    table.insert(espCorners, part)
+                    table.insert(espDiamonds, part)
                 end
             end
-            espCornerCFrame = espCornerCFrame * CFrame.Angles(0, math.rad(1.5), 0)
+            -- Вращение
+            espAngle = espAngle + 0.05
             local center = targetHRP.Position
             local radius = 2.5
-            local angles = {45, 135, 225, 315}
-            for i, angle in ipairs(angles) do
-                local part = espCorners[i]
+            for i, part in ipairs(espDiamonds) do
                 if part then
-                    local rad = math.rad(angle)
-                    local x = math.cos(rad) * radius
-                    local y = math.sin(rad) * radius
-                    local offset = espCornerCFrame:VectorToWorldSpace(Vector3.new(x, y, 0))
-                    part.CFrame = CFrame.new(center + offset, center)
+                    local angle = espAngle + (i - 1) * (math.pi * 2 / 8)
+                    local x = math.cos(angle) * radius
+                    local z = math.sin(angle) * radius
+                    local y = math.sin(espAngle * 2 + i) * 1
+                    part.CFrame = CFrame.new(center + Vector3.new(x, y, z)) * CFrame.Angles(math.rad(45), espAngle, math.rad(45))
                     part.Color = getAccentColor()
                 end
             end
         end
     else
-        for _, c in ipairs(espCorners) do if c and c.Parent then c:Destroy() end end
-        espCorners = {}
+        for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
+        espDiamonds = {}
     end
 end)
 
