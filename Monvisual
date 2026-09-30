@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v14)
+-- Monvisual GUI (Final v15)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -20,14 +20,12 @@ local themeCustomColor = nil
 local function getThemeColor()
     return Color3.fromRGB(20, 20, 30)
 end
-
 local function getAccentColor()
     if themeCustomColor then
         return Color3.new(math.min(themeCustomColor.R + 0.5, 1), math.min(themeCustomColor.G + 0.5, 1), math.min(themeCustomColor.B + 0.5, 1))
     end
     return Color3.fromHSV(themeHue / 360, 0.7, 0.9)
 end
-
 local function getTransparency()
     return 0.85
 end
@@ -212,41 +210,41 @@ local function ApplyTrails()
     end
 end
 
--- ===== HEADLESS через Neck.C0 (без провала под землю) =====
+-- ===== HEADLESS (твой код + переопределение в Stepped) =====
 local function ApplyHeadless()
     if headlessConnection then headlessConnection:Disconnect() headlessConnection = nil end
+
+    local function hideHead(character)
+        local head = character:WaitForChild("Head", 5)
+        if not head then return end
+        head.CFrame = head.CFrame + Vector3.new(0, -5, 0)
+        head.Transparency = 1
+        head.LocalTransparencyModifier = 1
+        for _, obj in ipairs(head:GetChildren()) do
+            if obj:IsA("Decal") then obj.Transparency = 1 end
+        end
+    end
+
+    local function restoreHead(character)
+        local head = character:FindFirstChild("Head")
+        if not head then return end
+        head.Transparency = 0
+        head.LocalTransparencyModifier = 0
+        for _, obj in ipairs(head:GetChildren()) do
+            if obj:IsA("Decal") then obj.Transparency = 0 end
+        end
+    end
+
     if settings.headlessEnabled then
+        if Player.Character then hideHead(Player.Character) end
         headlessConnection = RunService.Stepped:Connect(function()
             if not settings.headlessEnabled then return end
             local char = Player.Character
             if not char then return end
-            local head = char:FindFirstChild("Head")
-            if not head then return end
-            local neck = head:FindFirstChildOfClass("Motor6D")
-            if not neck then return end
-            neck.C0 = CFrame.new(0, -3, 0) * CFrame.Angles(math.rad(-90), 0, math.rad(180))
-            head.Transparency = 1
-            head.LocalTransparencyModifier = 1
-            for _, obj in ipairs(head:GetChildren()) do
-                if obj:IsA("Decal") then obj.Transparency = 1 end
-            end
+            hideHead(char)
         end)
     else
-        local char = Player.Character
-        if char then
-            local head = char:FindFirstChild("Head")
-            if head then
-                local neck = head:FindFirstChildOfClass("Motor6D")
-                if neck then
-                    neck.C0 = CFrame.new(0, 1, 0) * CFrame.Angles(math.rad(-90), 0, math.rad(180))
-                end
-                head.Transparency = 0
-                head.LocalTransparencyModifier = 0
-                for _, obj in ipairs(head:GetChildren()) do
-                    if obj:IsA("Decal") then obj.Transparency = 0 end
-                end
-            end
-        end
+        if Player.Character then restoreHead(Player.Character) end
     end
 end
 
@@ -401,7 +399,7 @@ for _, name in ipairs(categories) do
     btn.Size = UDim2.new(0.85, 0, 0, 30)
     btn.Position = UDim2.new(0.075, 0, 0, catY)
     btn.BackgroundColor3 = getThemeColor()
-    btn.BackgroundTransparency = 0.5
+    btn.BackgroundTransparency = 0.85
     btn.TextColor3 = getAccentColor()
     btn.Text = "◆ " .. name
     btn.TextSize = 13
@@ -471,7 +469,7 @@ CardContainer.ChildRemoved:Connect(function()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- ===== ОБНОВЛЕНИЕ ТЕМЫ (меняется ТОЛЬКО обводка/текст, фон всегда прозрачный) =====
+-- ===== ОБНОВЛЕНИЕ ТЕМЫ (всё прозрачно, меняется только обводка/текст) =====
 local function updateTheme()
     local accent = getAccentColor()
     local trans = getTransparency()
@@ -484,16 +482,17 @@ local function updateTheme()
     CardContainer.ScrollBarImageColor3 = accent
 
     for _, btn in ipairs(catButtons) do
-        btn.BackgroundTransparency = 0.5
+        btn.BackgroundTransparency = 0.85
         btn.TextColor3 = accent
     end
 
+    OpenBtn.BackgroundTransparency = 0.85
     OpenBtn.TextColor3 = accent
     OpenBorder.BackgroundColor3 = accent
 
     for _, card in ipairs(CardContainer:GetChildren()) do
         if card:IsA("Frame") then
-            card.BackgroundTransparency = 0.5
+            card.BackgroundTransparency = 0.85
             for _, child in ipairs(card:GetChildren()) do
                 if child:IsA("UIStroke") then child.Color = accent
                 elseif child:IsA("TextButton") and child.Text == "⚙" then child.BackgroundColor3 = accent end
@@ -630,7 +629,7 @@ local function createCards(list)
     for i, f in ipairs(list) do
         local card = Instance.new("Frame", CardContainer)
         card.BackgroundColor3 = getThemeColor()
-        card.BackgroundTransparency = 0.5
+        card.BackgroundTransparency = 0.85
         card.BorderSizePixel = 0
         local cc = Instance.new("UICorner", card)
         cc.CornerRadius = UDim.new(0, 10)
@@ -942,7 +941,7 @@ local function showThemes()
     for i, t in ipairs(baseThemes) do
         local card = Instance.new("Frame", CardContainer)
         card.BackgroundColor3 = getThemeColor()
-        card.BackgroundTransparency = 0.5
+        card.BackgroundTransparency = 0.85
         card.BorderSizePixel = 0
         local cc = Instance.new("UICorner", card)
         cc.CornerRadius = UDim.new(0, 10)
@@ -972,7 +971,7 @@ local function showThemes()
     local hueCard = Instance.new("Frame", CardContainer)
     hueCard.Size = UDim2.new(0.96, 0, 0, 100)
     hueCard.BackgroundColor3 = getThemeColor()
-    hueCard.BackgroundTransparency = 0.5
+    hueCard.BackgroundTransparency = 0.85
     hueCard.BorderSizePixel = 0
     local hcCorner = Instance.new("UICorner", hueCard)
     hcCorner.CornerRadius = UDim.new(0, 10)
@@ -1083,7 +1082,7 @@ local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 216, 0, 56)
 OpenBtn.Position = UDim2.new(0.5, -108, 0.001, 0)
 OpenBtn.BackgroundColor3 = getThemeColor()
-OpenBtn.BackgroundTransparency = 0.5
+OpenBtn.BackgroundTransparency = 0.85
 OpenBtn.TextColor3 = getAccentColor()
 OpenBtn.TextSize = 13
 OpenBtn.Font = Enum.Font.GothamBold
