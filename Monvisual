@@ -1,4 +1,4 @@
--- Monvisual GUI (Fixed theme sync)
+-- Monvisual GUI (Final + FPS button)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -83,6 +83,19 @@ local espAngle = 0
 local espTargetCFrame = nil
 local lastCameraCFrame = Camera.CFrame
 local skyParticleFolder, wingsModel, wingsCon, hatModel, trailFolder, trailCon
+
+-- FPS
+local fpsValue = 60
+local fpsCounter = 0
+local fpsTimer = tick()
+RunService.RenderStepped:Connect(function()
+    fpsCounter = fpsCounter + 1
+    if tick() - fpsTimer >= 1 then
+        fpsValue = fpsCounter
+        fpsCounter = 0
+        fpsTimer = tick()
+    end
+end)
 
 local themeElements = {}
 local function registerThemeElement(obj, prop)
@@ -481,7 +494,6 @@ for _, name in ipairs(categories) do
     btn.TextXAlignment = Enum.TextXAlignment.Left
     local c = Instance.new("UICorner", btn)
     c.CornerRadius = UDim.new(0, 8)
-    -- РЕГИСТРИРУЕМ КАЖДУЮ КНОПКУ КАТЕГОРИИ
     registerThemeElement(btn, "bg")
     registerThemeElement(btn, "text")
     table.insert(catButtons, btn)
@@ -1095,37 +1107,39 @@ catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- Кнопка входа
+-- КНОПКА ВХОДА (выше + 2 строки + FPS)
 local OpenBorder = Instance.new("Frame", ScreenGui)
-OpenBorder.Size = UDim2.new(0, 204, 0, 54)
-OpenBorder.Position = UDim2.new(0.5, -102, 0.03, -2)
+OpenBorder.Size = UDim2.new(0, 220, 0, 60)
+OpenBorder.Position = UDim2.new(0.5, -110, 0.01, -3)
 OpenBorder.BackgroundColor3 = getAccentColor()
 OpenBorder.BackgroundTransparency = 0.75
 OpenBorder.BorderSizePixel = 0
 OpenBorder.ZIndex = 1
 local obCorner = Instance.new("UICorner", OpenBorder)
-obCorner.CornerRadius = UDim.new(0, 13)
+obCorner.CornerRadius = UDim.new(0, 14)
 registerThemeElement(OpenBorder, "accent")
 
 local OpenBtn = Instance.new("TextButton", ScreenGui)
-OpenBtn.Size = UDim2.new(0, 200, 0, 50)
-OpenBtn.Position = UDim2.new(0.5, -100, 0.03, 0)
+OpenBtn.Size = UDim2.new(0, 216, 0, 56)
+OpenBtn.Position = UDim2.new(0.5, -108, 0.01, 0)
 OpenBtn.BackgroundColor3 = getThemeColor()
 OpenBtn.BackgroundTransparency = 0
 OpenBtn.TextColor3 = getAccentColor()
-OpenBtn.TextSize = 14
+OpenBtn.TextSize = 13
 OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0
-OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: 0"
+OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: 0 | FPS: 0"
+OpenBtn.TextWrapped = true
 OpenBtn.ZIndex = 2
 local oc = Instance.new("UICorner", OpenBtn)
 oc.CornerRadius = UDim.new(0, 12)
 registerThemeElement(OpenBtn, "bg")
 registerThemeElement(OpenBtn, "text")
 
+-- Обновление второй строки (ник + пинг + FPS)
 RunService.Heartbeat:Connect(function()
     local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-    OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: " .. ping
+    OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: " .. ping .. " | FPS: " .. fpsValue
 end)
 
 OpenBtn.MouseButton1Click:Connect(function()
