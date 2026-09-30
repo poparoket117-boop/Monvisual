@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v3)
+-- Monvisual GUI (Final v4)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -307,7 +307,7 @@ local function ApplyWings()
     end)
 end
 
--- ===== ИСПРАВЛЕННАЯ КИТАЙСКАЯ ШЛЯПА (рабочая) =====
+-- ===== ИСПРАВЛЕННАЯ КИТАЙСКАЯ ШЛЯПА =====
 local function ApplyHat()
     if hatCon then hatCon:Disconnect() hatCon = nil end
     if hatModel then hatModel:Destroy() hatModel = nil end
@@ -321,76 +321,74 @@ local function ApplyHat()
     hatModel.Name = "MonvisualHoloHat"
     hatModel.Parent = char
 
-    -- === КОНУС (основа шляпы) ===
+    local holoColor = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
+
+    -- === КОНУС ЧЕРЕЗ SPECIALMESH ===
     local cone = Instance.new("Part")
     cone.Name = "Cone"
-    cone.Size = Vector3.new(3, 3, 3) -- базовый размер
+    cone.Size = Vector3.new(2, 2, 2)
     cone.Anchored = false
     cone.CanCollide = false
     cone.Material = Enum.Material.ForceField
-    cone.Color = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
+    cone.Color = holoColor
     cone.Transparency = 0.3
     cone.Parent = hatModel
     
-    -- Нормальный конус через CylinderMesh
-    local cm = Instance.new("CylinderMesh")
-    cm.TopScale = 0       -- верх сужается в точку
-    cm.BottomScale = 1    -- низ широкий
-    cm.Scale = Vector3.new(1, 1.2, 1)
-    cm.Parent = cone
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.Cone
+    mesh.Scale = Vector3.new(1.5, 1.5, 1.5)
+    mesh.Parent = cone
     
     local weld1 = Instance.new("Weld")
     weld1.Part0 = head
     weld1.Part1 = cone
-    weld1.C0 = CFrame.new(0, 1.4, 0) * CFrame.Angles(0, 0, math.rad(90))
+    weld1.C0 = CFrame.new(0, 1.5, 0)
     weld1.Parent = cone
 
     -- === ШИРОКИЕ ПОЛЯ ===
     local brim = Instance.new("Part")
     brim.Name = "Brim"
-    brim.Size = Vector3.new(0.3, 5, 5)
+    brim.Size = Vector3.new(0.2, 5, 5)
     brim.Anchored = false
     brim.CanCollide = false
     brim.Material = Enum.Material.ForceField
-    brim.Color = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
-    brim.Transparency = 0.3
+    brim.Color = holoColor
+    brim.Transparency = 0.35
     brim.Parent = hatModel
-    local bm = Instance.new("CylinderMesh")
-    bm.Parent = brim
     local weld2 = Instance.new("Weld")
     weld2.Part0 = head
     weld2.Part1 = brim
-    weld2.C0 = CFrame.new(0, 0.9, 0) * CFrame.Angles(0, 0, math.rad(90))
+    weld2.C0 = CFrame.new(0, 0.9, 0)
     weld2.Parent = brim
 
     -- === КИСТОЧКА СВЕРХУ ===
     local tassel = Instance.new("Part")
     tassel.Name = "Tassel"
     tassel.Shape = Enum.PartType.Ball
-    tassel.Size = Vector3.new(0.5, 0.5, 0.5)
+    tassel.Size = Vector3.new(0.4, 0.4, 0.4)
     tassel.Anchored = false
     tassel.CanCollide = false
     tassel.Material = Enum.Material.Neon
-    tassel.Color = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
+    tassel.Color = holoColor
     tassel.Transparency = 0.1
     tassel.Parent = hatModel
     local weld3 = Instance.new("Weld")
     weld3.Part0 = head
     weld3.Part1 = tassel
-    weld3.C0 = CFrame.new(0, 2.1, 0)
+    weld3.C0 = CFrame.new(0, 2.3, 0)
     weld3.Parent = tassel
 
-    -- === МЕРЦАНИЕ ГОЛОГРАММЫ ===
+    -- === МЕРЦАНИЕ ===
     hatCon = RunService.Heartbeat:Connect(function()
         if not hatModel or not settings.hatEnabled then return end
         if not hatModel.Parent then return end
         local t = tick()
         local flicker = 0.3 + math.sin(t * 8) * 0.1
-        local holoColor = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
+        local holo = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
         for _, p in ipairs(hatModel:GetChildren()) do
             if p:IsA("BasePart") then
                 p.Transparency = flicker
-                p.Color = holoColor
+                p.Color = holo
             end
         end
     end)
@@ -508,23 +506,48 @@ local mainCorner = Instance.new("UICorner", Main)
 mainCorner.CornerRadius = UDim.new(0, 18)
 registerThemeElement(Main, "bg")
 
--- ===== ИСПРАВЛЕННАЯ АНИМАЦИЯ (по иконке: плавный подъём → плато) =====
+-- ===== ИСПРАВЛЕННАЯ АНИМАЦИЯ (плавное исчезновение 0.4 сек) =====
 local function toggleMenu(show)
     if show then
         Main.Visible = true
-        Main.Size = UDim2.new(0, 0, 0, 0)
-        Main.Position = UDim2.new(0.5, 0, 0.5, 0)
-        TweenService:Create(Main, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, 700, 0, 420),
-            Position = UDim2.new(0.5, -350, 0.5, -210)
+        Main.BackgroundTransparency = 1
+        for _, d in ipairs(Main:GetDescendants()) do
+            if d:IsA("Frame") then
+                if d ~= Main then d.BackgroundTransparency = 1 end
+            elseif d:IsA("TextButton") or d:IsA("TextLabel") then
+                d.BackgroundTransparency = 1
+            end
+        end
+        TweenService:Create(Main, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = getTransparency()
         }):Play()
+        for _, d in ipairs(Main:GetDescendants()) do
+            if d:IsA("Frame") and d ~= Main then
+                TweenService:Create(d, TweenInfo.new(0.4), {BackgroundTransparency = 0.3}):Play()
+            elseif d:IsA("TextButton") or d:IsA("TextLabel") then
+                TweenService:Create(d, TweenInfo.new(0.4), {BackgroundTransparency = 0}):Play()
+            end
+        end
     else
-        local tween = TweenService:Create(Main, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.InOut), {
-            Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0)
-        })
-        tween:Play()
-        tween.Completed:Connect(function() Main.Visible = false end)
+        TweenService:Create(Main, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            BackgroundTransparency = 1
+        }):Play()
+        for _, d in ipairs(Main:GetDescendants()) do
+            if d:IsA("Frame") or d:IsA("TextButton") or d:IsA("TextLabel") then
+                TweenService:Create(d, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+            end
+        end
+        task.delay(0.4, function()
+            Main.Visible = false
+            Main.BackgroundTransparency = getTransparency()
+            for _, d in ipairs(Main:GetDescendants()) do
+                if d:IsA("Frame") and d ~= Main then
+                    d.BackgroundTransparency = 0.3
+                elseif d:IsA("TextButton") or d:IsA("TextLabel") then
+                    d.BackgroundTransparency = 0
+                end
+            end
+        end)
     end
 end
 
