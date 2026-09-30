@@ -1,4 +1,4 @@
--- Monvisual GUI (Final + Holo Hat + CC)
+-- Monvisual GUI (Final)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -46,11 +46,10 @@ local settings = {
     skyParticlesEnabled = false, skyParticlesDensity = 10,
     trailsEnabled = false, trailsTransparency = 0.5,
     wingsEnabled = false, wingsColor = Color3.fromRGB(180, 100, 255),
-    hatEnabled = false, hatColor = Color3.fromRGB(200, 160, 100),
+    hatEnabled = false, hatSaturation = 0.8,
     rtxShadowsEnabled = false, rtxShadowsIntensity = 0.7,
     rtxReflectionsEnabled = false,
     rtxAOEnabled = false, rtxAOIntensity = 0.6,
-    ccEnabled = false, ccContrast = 1, ccBrightness = 0, ccSaturation = 0,
     dayNightEnabled = false, dayNightTime = 12,
     themeHue = 270
 }
@@ -71,7 +70,7 @@ local function LoadConfig()
     if not ok or not data then return end
     for k, v in pairs(data) do
         if k == "themeHue" then themeHue = v
-        elseif k == "wingsColor" or k == "hatColor" then settings[k] = Color3.new(v[1], v[2], v[3])
+        elseif k == "wingsColor" then settings[k] = Color3.new(v[1], v[2], v[3])
         elseif settings[k] ~= nil then settings[k] = v end
     end
 end
@@ -85,7 +84,6 @@ local espTargetCFrame = nil
 local lastCameraCFrame = Camera.CFrame
 local skyParticleFolder, wingsModel, wingsCon, hatModel, hatCon, trailFolder, trailCon
 
--- FPS
 local fpsValue = 60
 local fpsCounter = 0
 local fpsTimer = tick()
@@ -122,9 +120,15 @@ local function updateTheme()
     for _, d in ipairs(espDiamonds) do
         if d and d.Parent then d.Color = accent end
     end
+    if hatModel then
+        for _, p in ipairs(hatModel:GetDescendants()) do
+            if p:IsA("BasePart") then
+                p.Color = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
+            end
+        end
+    end
 end
 
--- ================== ФУНКЦИИ ==================
 local function ApplyStretch()
     if settings.stretchEnabled then Camera.CFrame = Camera.CFrame * stretchCFrame end
 end
@@ -303,7 +307,7 @@ local function ApplyWings()
     end)
 end
 
--- ГОЛОГРАММНАЯ ШЛЯПА
+-- КИТАЙСКАЯ ШЛЯПА (неострый конус — рисовая, голограмма)
 local function ApplyHat()
     if hatCon then hatCon:Disconnect() hatCon = nil end
     if hatModel then hatModel:Destroy() hatModel = nil end
@@ -316,47 +320,64 @@ local function ApplyHat()
     hatModel.Name = "MonvisualHoloHat"
     hatModel.Parent = char
 
-    -- Основа шляпы (прозрачная голограмма)
-    local cone = Instance.new("Part")
-    cone.Shape = Enum.PartType.Cylinder
-    cone.Size = Vector3.new(1.5, 3, 3)
-    cone.Anchored = false
-    cone.CanCollide = false
-    cone.Material = Enum.Material.ForceField
-    cone.Color = settings.hatColor
-    cone.Transparency = 0.5
-    cone.Parent = hatModel
-    local weld = Instance.new("Weld")
-    weld.Part0 = head
-    weld.Part1 = cone
-    weld.C0 = CFrame.new(0, 1.5, 0) * CFrame.Angles(0, 0, math.rad(90))
-    weld.Parent = cone
+    -- Основа: широкий плоский блин
+    local base = Instance.new("Part")
+    base.Shape = Enum.PartType.Cylinder
+    base.Size = Vector3.new(0.2, 5, 5)
+    base.Anchored = false
+    base.CanCollide = false
+    base.Material = Enum.Material.ForceField
+    base.Color = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
+    base.Transparency = 0.3
+    base.Parent = hatModel
+    local weld1 = Instance.new("Weld")
+    weld1.Part0 = head
+    weld1.Part1 = base
+    weld1.C0 = CFrame.new(0, 1.0, 0) * CFrame.Angles(0, 0, math.rad(90))
+    weld1.Parent = base
 
-    -- Верхушка
+    -- Купол: полусфера (не острый конус)
+    local dome = Instance.new("Part")
+    dome.Shape = Enum.PartType.Ball
+    dome.Size = Vector3.new(4.2, 3, 4.2)
+    dome.Anchored = false
+    dome.CanCollide = false
+    dome.Material = Enum.Material.ForceField
+    dome.Color = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
+    dome.Transparency = 0.3
+    dome.Parent = hatModel
+    local weld2 = Instance.new("Weld")
+    weld2.Part0 = head
+    weld2.Part1 = dome
+    weld2.C0 = CFrame.new(0, 0.2, 0)
+    weld2.Parent = dome
+
+    -- Верхушка: маленькая плоская кнопка
     local top = Instance.new("Part")
     top.Shape = Enum.PartType.Cylinder
-    top.Size = Vector3.new(0.8, 0.8, 0.8)
+    top.Size = Vector3.new(0.15, 0.8, 0.8)
     top.Anchored = false
     top.CanCollide = false
     top.Material = Enum.Material.Neon
-    top.Color = settings.hatColor
-    top.Transparency = 0.2
+    top.Color = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
+    top.Transparency = 0.1
     top.Parent = hatModel
-    local weld2 = Instance.new("Weld")
-    weld2.Part0 = head
-    weld2.Part1 = top
-    weld2.C0 = CFrame.new(0, 2.3, 0) * CFrame.Angles(0, 0, math.rad(90))
-    weld2.Parent = top
+    local weld3 = Instance.new("Weld")
+    weld3.Part0 = head
+    weld3.Part1 = top
+    weld3.C0 = CFrame.new(0, 1.8, 0) * CFrame.Angles(0, 0, math.rad(90))
+    weld3.Parent = top
 
-    -- Голографическое мерцание
+    -- Мерцание голограммы + цвет от темы
     hatCon = RunService.Heartbeat:Connect(function()
         if not hatModel or not settings.hatEnabled then return end
         local t = tick()
-        local flicker = 0.5 + math.sin(t * 8) * 0.15
+        local flicker = 0.3 + math.sin(t * 8) * 0.1
+        local holoColor = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
         for _, p in ipairs(hatModel:GetDescendants()) do
             if p:IsA("BasePart") then
                 p.Transparency = flicker
-                p.Color = settings.hatColor
+                p.Color = holoColor
             end
         end
     end)
@@ -420,24 +441,6 @@ local function ApplyRTX()
         if ao then ao:Destroy() end
     end
 end
-
--- ГИБКО НАСТРАИВАЕМЫЙ COLOR CORRECTION (0.05 – 100)
-local function ApplyCC()
-    local cc = Lighting:FindFirstChild("MonvisualCC")
-    if settings.ccEnabled then
-        if not cc then
-            cc = Instance.new("ColorCorrectionEffect")
-            cc.Name = "MonvisualCC"
-            cc.Parent = Lighting
-        end
-        cc.Contrast = settings.ccContrast
-        cc.Brightness = settings.ccBrightness
-        cc.Saturation = settings.ccSaturation
-    else
-        if cc then cc:Destroy() end
-    end
-end
-
 local function ApplyDayNight()
     if settings.dayNightEnabled then
         Lighting.ClockTime = settings.dayNightTime
@@ -458,7 +461,7 @@ end
 
 local function ApplyAllFunctions()
     ApplyFOV() ApplyFog() ApplySky() ApplySkyParticles() ApplyTrails()
-    ApplyRTX() ApplyCC() ApplyDayNight() ApplyMotionBlur()
+    ApplyRTX() ApplyDayNight() ApplyMotionBlur()
     task.spawn(function()
         if not Player.Character then Player.CharacterAdded:Wait() end
         task.wait(0.5)
@@ -487,9 +490,29 @@ Main.BackgroundColor3 = getThemeColor()
 Main.BackgroundTransparency = getTransparency()
 Main.BorderSizePixel = 0
 Main.Active = false
+Main.Visible = false
 local mainCorner = Instance.new("UICorner", Main)
 mainCorner.CornerRadius = UDim.new(0, 18)
 registerThemeElement(Main, "bg")
+
+local function toggleMenu(show)
+    if show then
+        Main.Visible = true
+        Main.Size = UDim2.new(0, 0, 0, 0)
+        Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+        TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 700, 0, 420),
+            Position = UDim2.new(0.5, -350, 0.5, -210)
+        }):Play()
+    else
+        local tween = TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Size = UDim2.new(0, 0, 0, 0),
+            Position = UDim2.new(0.5, 0, 0.5, 0)
+        })
+        tween:Play()
+        tween.Completed:Connect(function() Main.Visible = false end)
+    end
+end
 
 local Stroke = Instance.new("UIStroke", Main)
 Stroke.Color = getAccentColor()
@@ -922,25 +945,16 @@ local rtxAOFunc = {name = "RTX AO", desc = "Затенение окружени�
     settings = function() openSettings("Сила AO", 0.1, 1, settings.rtxAOIntensity, function(v) settings.rtxAOIntensity = v ApplyRTX() end) end,
     callback = function(on) settings.rtxAOEnabled = on ApplyRTX() end}
 
--- НОВАЯ ФУНКЦИЯ: ГИБКО НАСТРАИВАЕМЫЙ COLOR CORRECTION
-local ccFunc = {name = "Color Correction", desc = "Гибкая настройка: Contrast, Brightness, Saturation (0.05–100).", getState = function() return settings.ccEnabled end,
-    settings = function()
-        openSettings("Contrast", 0.05, 100, settings.ccContrast, function(v) settings.ccContrast = v ApplyCC() end)
-        openSettings("Brightness", -100, 100, settings.ccBrightness, function(v) settings.ccBrightness = v ApplyCC() end)
-        openSettings("Saturation", -100, 100, settings.ccSaturation, function(v) settings.ccSaturation = v ApplyCC() end)
-    end,
-    callback = function(on) settings.ccEnabled = on ApplyCC() end}
-
 local wingsFunc = {name = "Крылья", desc = "Анимированные крылья.", getState = function() return settings.wingsEnabled end,
     settings = function() openSettings("Цвет крыльев (HUE)", 0, 360, 270, function(v)
         settings.wingsColor = Color3.fromHSV(v/360, 0.8, 1)
         if wingsModel then for _, p in ipairs(wingsModel:GetDescendants()) do if p:IsA("BasePart") then p.Color = settings.wingsColor end end end end) end,
     callback = function(on) settings.wingsEnabled = on ApplyWings() end}
 
-local hatFunc = {name = "Китайская шляпа (голограмма)", desc = "Прозрачная, неоновая, мерцает.", getState = function() return settings.hatEnabled end,
-    settings = function() openSettings("Цвет шляпы (HUE)", 0, 360, 30, function(v)
-        settings.hatColor = Color3.fromHSV(v/360, 0.8, 1)
-        if hatModel then for _, p in ipairs(hatModel:GetDescendants()) do if p:IsA("BasePart") then p.Color = settings.hatColor end end end end) end,
+local hatFunc = {name = "Китайская шляпа (голограмма)", desc = "Неострый конус, цвет от темы.", getState = function() return settings.hatEnabled end,
+    settings = function()
+        openSettings("Насыщенность", 0, 1, settings.hatSaturation, function(v) settings.hatSaturation = v end)
+    end,
     callback = function(on) settings.hatEnabled = on ApplyHat() end}
 
 RunService.Heartbeat:Connect(function()
@@ -1150,13 +1164,13 @@ catButtons[2].MouseButton1Click:Connect(function()
 end)
 catButtons[3].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Шейдеры"
-    createCards({rtxShadowsFunc, rtxReflectionsFunc, rtxAOFunc, ccFunc})
+    createCards({rtxShadowsFunc, rtxReflectionsFunc, rtxAOFunc})
 end)
 catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- КНОПКА ВХОДА (выше + FPS)
+-- КНОПКА ВХОДА
 local OpenBorder = Instance.new("Frame", ScreenGui)
 OpenBorder.Size = UDim2.new(0, 220, 0, 60)
 OpenBorder.Position = UDim2.new(0.5, -110, 0.001, -3)
@@ -1191,13 +1205,13 @@ RunService.Heartbeat:Connect(function()
 end)
 
 OpenBtn.MouseButton1Click:Connect(function()
-    Main.Visible = not Main.Visible
+    toggleMenu(not Main.Visible)
 end)
 
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
-        Main.Visible = not Main.Visible
+        toggleMenu(not Main.Visible)
     end
 end)
 
