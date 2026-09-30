@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v17)
+-- Monvisual GUI (Final v18)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -23,7 +23,7 @@ local function getThemeColor()
     return Color3.fromRGB(20, 20, 30)
 end
 local function getAccentColor()
-    if themeIsWhite then return Color3.fromRGB(255, 255, 255) end
+    if themeIsWhite then return Color3.fromRGB(60, 60, 60) end
     if themeCustomColor then
         return Color3.new(math.min(themeCustomColor.R + 0.5, 1), math.min(themeCustomColor.G + 0.5, 1), math.min(themeCustomColor.B + 0.5, 1))
     end
@@ -219,7 +219,7 @@ local function ApplyTrails()
     end
 end
 
--- ===== HEADLESS (твой код) =====
+-- ===== HEADLESS =====
 local function ApplyHeadless()
     if headlessConnection then headlessConnection:Disconnect() headlessConnection = nil end
 
@@ -366,7 +366,6 @@ Main.Visible = false
 local mainCorner = Instance.new("UICorner", Main)
 mainCorner.CornerRadius = UDim.new(0, 18)
 
--- Блюр-эффект на меню
 local uiBlur = Instance.new("BlurEffect")
 uiBlur.Name = "MonvisualUIBlur"
 uiBlur.Size = 0
@@ -510,7 +509,8 @@ local function updateTheme()
 
     OpenBtn.BackgroundTransparency = 0.85
     OpenBtn.TextColor3 = textCol
-    OpenBorder.BackgroundColor3 = accent
+    OpenBorder.BackgroundColor3 = textCol
+    if OpenStroke then OpenStroke.Color = textCol end
 
     for _, card in ipairs(CardContainer:GetChildren()) do
         if card:IsA("Frame") then
@@ -699,7 +699,6 @@ local function createCards(list)
             setBtn.MouseButton1Click:Connect(function() f.settings() end)
         end
 
-        -- ===== УМЕНЬШЕННЫЙ ТУМБЛЕР (22x12) С ТЕКСТОМ OFF/ON =====
         local toggle = Instance.new("TextButton", card)
         toggle.Size = UDim2.new(0, 22, 0, 12)
         toggle.Position = UDim2.new(1, -26, 0, 6)
@@ -1096,11 +1095,11 @@ catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- КНОПКА ВХОДА
+-- ===== КНОПКА ВХОДА (прозрачная, заблюренная, только имя + FPS) =====
 local OpenBorder = Instance.new("Frame", ScreenGui)
 OpenBorder.Size = UDim2.new(0, 160, 0, 44)
 OpenBorder.Position = UDim2.new(0.5, -80, 0.001, -3)
-OpenBorder.BackgroundColor3 = getAccentColor()
+OpenBorder.BackgroundColor3 = getTextColor()
 OpenBorder.BackgroundTransparency = 0.75
 OpenBorder.BorderSizePixel = 0
 OpenBorder.ZIndex = 1
@@ -1116,11 +1115,22 @@ OpenBtn.TextColor3 = getTextColor()
 OpenBtn.TextSize = 12
 OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0
-OpenBtn.Text = "MONVISUAL"
+OpenBtn.Text = "MONVISUAL\nFPS: " .. fpsValue
 OpenBtn.TextWrapped = true
 OpenBtn.ZIndex = 2
 local oc = Instance.new("UICorner", OpenBtn)
 oc.CornerRadius = UDim.new(0, 10)
+
+-- Блюр для кнопки
+local btnBlur = Instance.new("BlurEffect")
+btnBlur.Name = "MonvisualBtnBlur"
+btnBlur.Size = 6
+btnBlur.Parent = Lighting
+
+-- Обводка кнопки (меняется по теме)
+local OpenStroke = Instance.new("UIStroke", OpenBorder)
+OpenStroke.Color = getTextColor()
+OpenStroke.Thickness = 2
 
 OpenBtn.MouseButton1Click:Connect(function()
     toggleMenu(not Main.Visible)
