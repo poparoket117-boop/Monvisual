@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v20)
+-- Monvisual GUI (Final v21)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -314,14 +314,23 @@ local function ApplyDayNight()
     end
 end
 
+-- Применяем всё загруженное состояние
 task.spawn(function()
     if not Player.Character then Player.CharacterAdded:Wait() end
     task.wait(0.5)
-    ApplyParticles() ApplyHeadless()
+    ApplyStretch() ApplyFOV() ApplyParticles() ApplyFog() ApplySky()
+    ApplySkyParticles() ApplyTrails() ApplyHeadless() ApplyRTX() ApplyDayNight()
 end)
 Player.CharacterAdded:Connect(function()
     task.wait(1)
     ApplyParticles() ApplyHeadless()
+end)
+
+-- Растяг в каждом кадре (это важно!)
+RunService.RenderStepped:Connect(function()
+    if settings.stretchEnabled then
+        Camera.CFrame = Camera.CFrame * stretchCFrame
+    end
 end)
 
 -- ================== GUI ==================
@@ -483,21 +492,25 @@ local function updateTheme()
         btn.TextColor3 = textCol
     end
 
-    -- Кнопка входа: обводка меняется, текст всегда белый
+    -- Кнопка входа: обводка белая тонкая, текст всегда белый
     OpenBtn.BackgroundTransparency = 0.85
-    OpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    if OpenStroke then OpenStroke.Color = accent end
-
-    -- Эффекты
-    if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
-    for _, d in ipairs(espDiamonds) do
-        if d and d.Parent then d.Color = accent end
+    OpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255) -- СТАТИЧНО БЕЛЫЙ
+    if OpenStroke then
+        OpenStroke.Color = Color3.fromRGB(255, 255, 255) -- СТАТИЧНО БЕЛАЯ
+        OpenStroke.Thickness = 1
     end
+
+    -- Партиклы: пересоздаём, чтобы цвет обновился
+    if settings.particlesEnabled then
+        ApplyParticles()
+    end
+    -- Trails перекрашиваем
     if trailFolder then
         for _, t in ipairs(trailFolder:GetChildren()) do
             if t:IsA("BasePart") then t.Color = accent end
         end
     end
+    -- SkyParticles перекрашиваем
     if skyParticleFolder then
         for _, d in ipairs(skyParticleFolder:GetChildren()) do
             if d:IsA("BasePart") then d.Color = accent end
@@ -1061,7 +1074,7 @@ end)
 local OpenBorder = Instance.new("Frame", ScreenGui)
 OpenBorder.Size = UDim2.new(0, 160, 0, 44)
 OpenBorder.Position = UDim2.new(0.5, -80, 0.001, -3)
-OpenBorder.BackgroundColor3 = getTextColor()
+OpenBorder.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 OpenBorder.BackgroundTransparency = 0.75
 OpenBorder.BorderSizePixel = 0
 OpenBorder.ZIndex = 1
@@ -1073,7 +1086,7 @@ OpenBtn.Size = UDim2.new(0, 156, 0, 40)
 OpenBtn.Position = UDim2.new(0.5, -78, 0.001, 0)
 OpenBtn.BackgroundColor3 = getThemeColor()
 OpenBtn.BackgroundTransparency = 0.85
-OpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+OpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)  -- ВСЕГДА БЕЛЫЙ
 OpenBtn.TextSize = 12
 OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0
@@ -1089,8 +1102,8 @@ btnBlur.Size = 6
 btnBlur.Parent = Lighting
 
 local OpenStroke = Instance.new("UIStroke", OpenBorder)
-OpenStroke.Color = getAccentColor()
-OpenStroke.Thickness = 1.5
+OpenStroke.Color = Color3.fromRGB(255, 255, 255)  -- ВСЕГДА БЕЛАЯ
+OpenStroke.Thickness = 1
 
 RunService.Heartbeat:Connect(function()
     OpenBtn.Text = "MONVISUAL\nFPS: " .. fpsValue
