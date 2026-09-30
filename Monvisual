@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v18)
+-- Monvisual GUI (Final v19)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -43,7 +43,6 @@ local settings = {
     particlesEnabled = false,
     targetESPEnabled = false,
     landingCircleEnabled = false, rippleSize = 0.1, rippleTransparency = 0.5,
-    motionBlurEnabled = false, motionBlurAmount = 3,
     fogEnabled = false, fogStart = 50, fogEnd = 500,
     skyShaderEnabled = false, skyShaderID = 105721322908215,
     skyParticlesEnabled = false, skyParticlesDensity = 10,
@@ -83,7 +82,6 @@ local particleAttachment, particleEmitter
 local espDiamonds = {}
 local espAngle = 0
 local espTargetCFrame = nil
-local lastCameraCFrame = Camera.CFrame
 local skyParticleFolder, trailFolder, trailCon
 local headlessConnection = nil
 
@@ -219,7 +217,6 @@ local function ApplyTrails()
     end
 end
 
--- ===== HEADLESS =====
 local function ApplyHeadless()
     if headlessConnection then headlessConnection:Disconnect() headlessConnection = nil end
 
@@ -329,12 +326,6 @@ local function ApplyDayNight()
         Lighting.ClockTime = 14
         Lighting.Brightness = 1
         Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
-    end
-end
-local function ApplyMotionBlur()
-    if not settings.motionBlurEnabled then
-        local blur = Lighting:FindFirstChild("MonvisualBlur")
-        if blur then blur:Destroy() end
     end
 end
 
@@ -507,10 +498,26 @@ local function updateTheme()
         btn.TextColor3 = textCol
     end
 
+    -- Кнопка входа: обводка меняется с темой, текст всегда белый
     OpenBtn.BackgroundTransparency = 0.85
-    OpenBtn.TextColor3 = textCol
-    OpenBorder.BackgroundColor3 = textCol
-    if OpenStroke then OpenStroke.Color = textCol end
+    OpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    if OpenStroke then OpenStroke.Color = accent end
+
+    -- Эффекты перекрашиваются
+    if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
+    for _, d in ipairs(espDiamonds) do
+        if d and d.Parent then d.Color = accent end
+    end
+    if trailFolder then
+        for _, t in ipairs(trailFolder:GetChildren()) do
+            if t:IsA("BasePart") then t.Color = accent end
+        end
+    end
+    if skyParticleFolder then
+        for _, d in ipairs(skyParticleFolder:GetChildren()) do
+            if d:IsA("BasePart") then d.Color = accent end
+        end
+    end
 
     for _, card in ipairs(CardContainer:GetChildren()) do
         if card:IsA("Frame") then
@@ -533,11 +540,6 @@ local function updateTheme()
                 elseif child:IsA("Frame") and child:FindFirstChildOfClass("UICorner") then child.BackgroundColor3 = accent end
             end
         end
-    end
-
-    if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
-    for _, d in ipairs(espDiamonds) do
-        if d and d.Parent then d.Color = accent end
     end
 end
 
@@ -778,10 +780,6 @@ local circleFunc = {name="Волна при прыжке", desc="Эффект к
     end,
     callback=function(on) settings.landingCircleEnabled=on end}
 
-local blurFunc = {name="Motion Blur", desc="Размытие при движении камеры.", getState=function() return settings.motionBlurEnabled end,
-    settings=function() openSettings("Motion Blur", {{name="Сила", min=1, max=10, default=settings.motionBlurAmount, callback=function(v) settings.motionBlurAmount=v end}}) end,
-    callback=function(on) settings.motionBlurEnabled=on ApplyMotionBlur() end}
-
 local fogFunc = {name="Туман", desc="Туман под цвет темы.", getState=function() return settings.fogEnabled end,
     settings=function() openSettings("Туман", {{name="Дальность", min=50, max=1000, default=settings.fogEnd, callback=function(v) settings.fogEnd=v ApplyFog() end}}) end,
     callback=function(on) settings.fogEnabled=on ApplyFog() end}
@@ -886,23 +884,6 @@ RunService.Heartbeat:Connect(function()
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
     particleEmitter.Rate = (hum.MoveDirection.Magnitude > 0.1) and 60 or 0
-end)
-
-RunService.RenderStepped:Connect(function()
-    ApplyStretch()
-    if not settings.motionBlurEnabled then return end
-    local current = Camera.CFrame
-    local delta = (current.Position - lastCameraCFrame.Position).Magnitude
-    local rotDelta = (current.LookVector - lastCameraCFrame.LookVector).Magnitude
-    local movement = delta + rotDelta * 0.5
-    local blur = Lighting:FindFirstChild("MonvisualBlur")
-    if not blur then
-        blur = Instance.new("BlurEffect")
-        blur.Name = "MonvisualBlur"
-        blur.Parent = Lighting
-    end
-    blur.Size = math.clamp(movement * settings.motionBlurAmount * 20, 0, settings.motionBlurAmount)
-    lastCameraCFrame = current
 end)
 
 local function spawnRipple(pos)
@@ -1081,7 +1062,7 @@ end
 
 catButtons[1].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Визуал"
-    createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, blurFunc, fogFunc, skyShaderFunc, dayNightFunc})
+    createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, fogFunc, skyShaderFunc, dayNightFunc})
 end)
 catButtons[2].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Косметика"
@@ -1095,7 +1076,7 @@ catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- ===== КНОПКА ВХОДА (прозрачная, заблюренная, только имя + FPS) =====
+-- КНОПКА ВХОДА
 local OpenBorder = Instance.new("Frame", ScreenGui)
 OpenBorder.Size = UDim2.new(0, 160, 0, 44)
 OpenBorder.Position = UDim2.new(0.5, -80, 0.001, -3)
@@ -1111,7 +1092,7 @@ OpenBtn.Size = UDim2.new(0, 156, 0, 40)
 OpenBtn.Position = UDim2.new(0.5, -78, 0.001, 0)
 OpenBtn.BackgroundColor3 = getThemeColor()
 OpenBtn.BackgroundTransparency = 0.85
-OpenBtn.TextColor3 = getTextColor()
+OpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 OpenBtn.TextSize = 12
 OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0
@@ -1121,16 +1102,18 @@ OpenBtn.ZIndex = 2
 local oc = Instance.new("UICorner", OpenBtn)
 oc.CornerRadius = UDim.new(0, 10)
 
--- Блюр для кнопки
 local btnBlur = Instance.new("BlurEffect")
 btnBlur.Name = "MonvisualBtnBlur"
 btnBlur.Size = 6
 btnBlur.Parent = Lighting
 
--- Обводка кнопки (меняется по теме)
 local OpenStroke = Instance.new("UIStroke", OpenBorder)
-OpenStroke.Color = getTextColor()
-OpenStroke.Thickness = 2
+OpenStroke.Color = getAccentColor()
+OpenStroke.Thickness = 1.5
+
+RunService.Heartbeat:Connect(function()
+    OpenBtn.Text = "MONVISUAL\nFPS: " .. fpsValue
+end)
 
 OpenBtn.MouseButton1Click:Connect(function()
     toggleMenu(not Main.Visible)
