@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v8)
+-- Monvisual GUI (Final v9)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -241,28 +241,28 @@ local function ApplyTrails()
     end
 end
 
--- ===== HEADLESS =====
+-- ===== HEADLESS (твой способ через neck.Transform) =====
 local function ApplyHeadless()
     if headlessCon then headlessCon:Disconnect() headlessCon = nil end
     local char = Player.Character
     if not char then return end
-    local head = char:FindFirstChild("Head")
-    if not head then return end
-    local neck = head:FindFirstChildOfClass("Motor6D")
+    local upperTorso = char:FindFirstChild("UpperTorso")
+    if not upperTorso then return end
+    local neck = upperTorso:FindFirstChild("Neck")
     if not neck then return end
     if settings.headlessEnabled then
-        neck.C0 = CFrame.new(0, -100, 0) * CFrame.Angles(math.rad(-90), 0, math.rad(180))
+        neck.Transform = CFrame.new(0, -5, 0)
         headlessCon = RunService.Heartbeat:Connect(function()
             if not settings.headlessEnabled then return end
             local c = Player.Character
             if not c then return end
-            local h = c:FindFirstChild("Head")
-            if not h then return end
-            local n = h:FindFirstChildOfClass("Motor6D")
-            if n then n.C0 = CFrame.new(0, -100, 0) * CFrame.Angles(math.rad(-90), 0, math.rad(180)) end
+            local ut = c:FindFirstChild("UpperTorso")
+            if not ut then return end
+            local n = ut:FindFirstChild("Neck")
+            if n then n.Transform = CFrame.new(0, -5, 0) end
         end)
     else
-        neck.C0 = CFrame.new(0, 1, 0) * CFrame.Angles(math.rad(-90), 0, math.rad(180))
+        neck.Transform = CFrame.new(0, 0, 0)
     end
 end
 
@@ -464,7 +464,6 @@ SectionTitle.Font = Enum.Font.GothamBold
 SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
 registerThemeElement(SectionTitle, "text")
 
--- Кнопка закрытия меню
 local CloseMenu = Instance.new("TextButton", Main)
 CloseMenu.Size = UDim2.new(0, 26, 0, 26)
 CloseMenu.Position = UDim2.new(1, -32, 0, 6)
@@ -507,7 +506,6 @@ CardContainer.ChildRemoved:Connect(function()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- ===== НАСТРОЙКИ В СТОЛБИК =====
 local function openSettings(title, sliders)
     local existing = ScreenGui:FindFirstChild("Settings_" .. title)
     if existing then existing:Destroy() return end
@@ -618,7 +616,6 @@ local function openSettings(title, sliders)
     end
 end
 
--- ===== КАРТОЧКИ =====
 local function createCards(list)
     for _, child in ipairs(CardContainer:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
@@ -716,7 +713,7 @@ local function createCards(list)
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- ===== ВСЕ ФУНКЦИИ =====
+-- ===== ФУНКЦИИ =====
 local fovFunc = {name = "FOV", desc = "Меняет поле зрения.", getState = function() return settings.fovEnabled end,
     settings = function() openSettings("FOV", {
         {name = "FOV", min = 30, max = 120, default = settings.fovValue, callback = function(v) settings.fovValue = v ApplyFOV() end}
@@ -802,10 +799,10 @@ local rtxAOFunc = {name = "RTX AO", desc = "Затенение окружени�
     }) end,
     callback = function(on) settings.rtxAOEnabled = on ApplyRTX() end}
 
-local headlessFunc = {name = "Headless", desc = "Голова уходит далеко вниз — её не видно.", getState = function() return settings.headlessEnabled end,
+local headlessFunc = {name = "Headless", desc = "Голова уходит вниз — её не видно.", getState = function() return settings.headlessEnabled end,
     callback = function(on) settings.headlessEnabled = on ApplyHeadless() end}
 
--- ===== TARGET ESP LOOP =====
+-- TARGET ESP LOOP
 RunService.Heartbeat:Connect(function()
     if not settings.targetESPEnabled then
         for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
@@ -877,7 +874,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ===== РАЗНЫЕ ЦИКЛЫ =====
+-- PARTICLES / BLUR / RIPPLE LOOPS
 RunService.Heartbeat:Connect(function()
     if not settings.particlesEnabled or not particleEmitter then return end
     local char = Player.Character
@@ -943,7 +940,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ===== ТЕМЫ =====
+-- THEMES
 local baseThemes = {
     {name = "Фиолетовая", hue = 270},
     {name = "Синяя", hue = 220},
@@ -1076,7 +1073,7 @@ local function showThemes()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- ===== ПОДКЛЮЧЕНИЕ КАТЕГОРИЙ =====
+-- CATEGORIES
 catButtons[1].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Визуал"
     createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, blurFunc, fogFunc, skyShaderFunc, dayNightFunc})
@@ -1093,7 +1090,7 @@ catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- КНОПКА ВХОДА
+-- OPEN BUTTON
 local OpenBorder = Instance.new("Frame", ScreenGui)
 OpenBorder.Size = UDim2.new(0, 220, 0, 60)
 OpenBorder.Position = UDim2.new(0.5, -110, 0.001, -3)
