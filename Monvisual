@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v12)
+-- Monvisual GUI (Final v13)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -10,7 +10,6 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
-local Stats = game:GetService("Stats")
 local HttpService = game:GetService("HttpService")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -94,6 +93,31 @@ RunService.RenderStepped:Connect(function()
         fpsTimer = tick()
     end
 end)
+
+local themeElements = {}
+local function registerThemeElement(obj, prop)
+    table.insert(themeElements, {obj = obj, prop = prop})
+end
+
+local function updateTheme()
+    local accent = getAccentColor()
+    local trans = getTransparency()
+    for _, item in ipairs(themeElements) do
+        if item.obj and item.obj.Parent then
+            if item.prop == "bg" then
+                -- ФОН НЕ МЕНЯЕТСЯ — только прозрачность фиксирована
+                item.obj.BackgroundTransparency = trans
+            elseif item.prop == "accent" then item.obj.BackgroundColor3 = accent
+            elseif item.prop == "text" then item.obj.TextColor3 = accent
+            elseif item.prop == "stroke" then item.obj.Color = accent
+            end
+        end
+    end
+    if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
+    for _, d in ipairs(espDiamonds) do
+        if d and d.Parent then d.Color = accent end
+    end
+end
 
 local function ApplyStretch()
     if settings.stretchEnabled then Camera.CFrame = Camera.CFrame * stretchCFrame end
@@ -215,7 +239,7 @@ local function ApplyTrails()
     end
 end
 
--- ===== HEADLESS =====
+-- ===== HEADLESS (твой способ, но переопределяем в Stepped) =====
 local function ApplyHeadless()
     if headlessConnection then headlessConnection:Disconnect() headlessConnection = nil end
     if settings.headlessEnabled then
@@ -223,18 +247,23 @@ local function ApplyHeadless()
             if not settings.headlessEnabled then return end
             local char = Player.Character
             if not char then return end
-            local upperTorso = char:FindFirstChild("UpperTorso")
-            if not upperTorso then return end
-            local neck = upperTorso:FindFirstChild("Neck")
-            if neck then neck.Transform = CFrame.new(0, -5, 0) end
+            local head = char:FindFirstChild("Head")
+            if not head then return end
+            head.CFrame = head.CFrame + Vector3.new(0, -0.5, 0)
+            head.Transparency = 1
+            for _, obj in ipairs(head:GetChildren()) do
+                if obj:IsA("Decal") then obj.Transparency = 1 end
+            end
         end)
     else
         local char = Player.Character
         if char then
-            local ut = char:FindFirstChild("UpperTorso")
-            if ut then
-                local n = ut:FindFirstChild("Neck")
-                if n then n.Transform = CFrame.new(0, 0, 0) end
+            local head = char:FindFirstChild("Head")
+            if head then
+                head.Transparency = 0
+                for _, obj in ipairs(head:GetChildren()) do
+                    if obj:IsA("Decal") then obj.Transparency = 0 end
+                end
             end
         end
     end
@@ -344,10 +373,6 @@ Main.Visible = false
 local mainCorner = Instance.new("UICorner", Main)
 mainCorner.CornerRadius = UDim.new(0, 18)
 
-local Stroke = Instance.new("UIStroke", Main)
-Stroke.Color = getAccentColor()
-Stroke.Thickness = 2
-
 local function toggleMenu(show)
     if show then
         Main.Visible = true
@@ -366,6 +391,10 @@ local function toggleMenu(show)
         tween.Completed:Connect(function() Main.Visible = false end)
     end
 end
+
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Color = getAccentColor()
+Stroke.Thickness = 2
 
 local SideBar = Instance.new("Frame", Main)
 SideBar.Size = UDim2.new(0, 200, 1, 0)
@@ -461,15 +490,13 @@ CardContainer.ChildRemoved:Connect(function()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- ===== ОБНОВЛЕНИЕ ТЕМЫ =====
+-- ===== ОБНОВЛЕНИЕ ТЕМЫ (меняется ТОЛЬКО обводка/текст/акценты, фон остаётся) =====
 local function updateTheme()
-    local base = getThemeColor()
     local accent = getAccentColor()
     local trans = getTransparency()
 
-    Main.BackgroundColor3 = base
+    -- фон НЕ трогаем
     Main.BackgroundTransparency = trans
-    SideBar.BackgroundColor3 = base
     SideBar.BackgroundTransparency = trans
     Stroke.Color = accent
     Logo.TextColor3 = accent
@@ -477,17 +504,15 @@ local function updateTheme()
     CardContainer.ScrollBarImageColor3 = accent
 
     for _, btn in ipairs(catButtons) do
-        btn.BackgroundColor3 = base
+        btn.BackgroundTransparency = 0.3
         btn.TextColor3 = accent
     end
 
-    OpenBtn.BackgroundColor3 = base
     OpenBtn.TextColor3 = accent
     OpenBorder.BackgroundColor3 = accent
 
     for _, card in ipairs(CardContainer:GetChildren()) do
         if card:IsA("Frame") then
-            card.BackgroundColor3 = base
             card.BackgroundTransparency = 0.3
             for _, child in ipairs(card:GetChildren()) do
                 if child:IsA("UIStroke") then child.Color = accent
@@ -498,7 +523,6 @@ local function updateTheme()
 
     for _, sf in ipairs(ScreenGui:GetChildren()) do
         if sf:IsA("Frame") and sf.Name:sub(1,9) == "Settings_" then
-            sf.BackgroundColor3 = base
             sf.BackgroundTransparency = trans
             for _, child in ipairs(sf:GetChildren()) do
                 if child:IsA("TextLabel") then child.TextColor3 = accent
