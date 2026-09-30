@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v10)
+-- Monvisual GUI (Final v12)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -94,32 +94,6 @@ RunService.RenderStepped:Connect(function()
         fpsTimer = tick()
     end
 end)
-
-local themeElements = {}
-local function registerThemeElement(obj, prop)
-    table.insert(themeElements, {obj = obj, prop = prop})
-end
-
-local function updateTheme()
-    local base = getThemeColor()
-    local accent = getAccentColor()
-    local trans = getTransparency()
-    for _, item in ipairs(themeElements) do
-        if item.obj and item.obj.Parent then
-            if item.prop == "bg" then
-                item.obj.BackgroundColor3 = base
-                item.obj.BackgroundTransparency = trans
-            elseif item.prop == "accent" then item.obj.BackgroundColor3 = accent
-            elseif item.prop == "text" then item.obj.TextColor3 = accent
-            elseif item.prop == "stroke" then item.obj.Color = accent
-            end
-        end
-    end
-    if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
-    for _, d in ipairs(espDiamonds) do
-        if d and d.Parent then d.Color = accent end
-    end
-end
 
 local function ApplyStretch()
     if settings.stretchEnabled then Camera.CFrame = Camera.CFrame * stretchCFrame end
@@ -241,7 +215,7 @@ local function ApplyTrails()
     end
 end
 
--- ===== HEADLESS (через neck.Transform в Stepped — перекрывает анимации) =====
+-- ===== HEADLESS =====
 local function ApplyHeadless()
     if headlessConnection then headlessConnection:Disconnect() headlessConnection = nil end
     if settings.headlessEnabled then
@@ -252,9 +226,7 @@ local function ApplyHeadless()
             local upperTorso = char:FindFirstChild("UpperTorso")
             if not upperTorso then return end
             local neck = upperTorso:FindFirstChild("Neck")
-            if neck then
-                neck.Transform = CFrame.new(0, -5, 0)
-            end
+            if neck then neck.Transform = CFrame.new(0, -5, 0) end
         end)
     else
         local char = Player.Character
@@ -344,19 +316,12 @@ local function ApplyMotionBlur()
     end
 end
 
-local function ApplyAllFunctions()
-    ApplyFOV() ApplyFog() ApplySky() ApplySkyParticles() ApplyTrails()
-    ApplyRTX() ApplyDayNight() ApplyMotionBlur()
-    task.spawn(function()
-        if not Player.Character then Player.CharacterAdded:Wait() end
-        task.wait(0.5)
-        ApplyParticles() ApplyHeadless()
-    end)
-end
-
-task.spawn(ApplyAllFunctions)
-
-Player.CharacterAdded:Connect(function(char)
+task.spawn(function()
+    if not Player.Character then Player.CharacterAdded:Wait() end
+    task.wait(0.5)
+    ApplyParticles() ApplyHeadless()
+end)
+Player.CharacterAdded:Connect(function()
     task.wait(1)
     ApplyParticles() ApplyHeadless()
 end)
@@ -378,7 +343,10 @@ Main.Active = false
 Main.Visible = false
 local mainCorner = Instance.new("UICorner", Main)
 mainCorner.CornerRadius = UDim.new(0, 18)
-registerThemeElement(Main, "bg")
+
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Color = getAccentColor()
+Stroke.Thickness = 2
 
 local function toggleMenu(show)
     if show then
@@ -399,11 +367,6 @@ local function toggleMenu(show)
     end
 end
 
-local Stroke = Instance.new("UIStroke", Main)
-Stroke.Color = getAccentColor()
-Stroke.Thickness = 2
-registerThemeElement(Stroke, "stroke")
-
 local SideBar = Instance.new("Frame", Main)
 SideBar.Size = UDim2.new(0, 200, 1, 0)
 SideBar.BackgroundColor3 = getThemeColor()
@@ -411,7 +374,6 @@ SideBar.BackgroundTransparency = getTransparency()
 SideBar.BorderSizePixel = 0
 local sideCorner = Instance.new("UICorner", SideBar)
 sideCorner.CornerRadius = UDim.new(0, 18)
-registerThemeElement(SideBar, "bg")
 
 local Logo = Instance.new("TextLabel", SideBar)
 Logo.Size = UDim2.new(1, 0, 0, 70)
@@ -420,7 +382,6 @@ Logo.Text = "MONVISUAL\n" .. Player.Name
 Logo.TextColor3 = getAccentColor()
 Logo.TextSize = 18
 Logo.Font = Enum.Font.GothamBold
-registerThemeElement(Logo, "text")
 
 local categories = {"Визуал", "Косметика", "Шейдеры", "Темы"}
 local catButtons = {}
@@ -439,8 +400,6 @@ for _, name in ipairs(categories) do
     btn.TextXAlignment = Enum.TextXAlignment.Left
     local c = Instance.new("UICorner", btn)
     c.CornerRadius = UDim.new(0, 8)
-    registerThemeElement(btn, "bg")
-    registerThemeElement(btn, "text")
     table.insert(catButtons, btn)
     catY = catY + 34
 end
@@ -459,7 +418,6 @@ SectionTitle.TextColor3 = getAccentColor()
 SectionTitle.TextSize = 18
 SectionTitle.Font = Enum.Font.GothamBold
 SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
-registerThemeElement(SectionTitle, "text")
 
 local CloseMenu = Instance.new("TextButton", Main)
 CloseMenu.Size = UDim2.new(0, 26, 0, 26)
@@ -503,81 +461,129 @@ CardContainer.ChildRemoved:Connect(function()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end)
 
+-- ===== ОБНОВЛЕНИЕ ТЕМЫ =====
+local function updateTheme()
+    local base = getThemeColor()
+    local accent = getAccentColor()
+    local trans = getTransparency()
+
+    Main.BackgroundColor3 = base
+    Main.BackgroundTransparency = trans
+    SideBar.BackgroundColor3 = base
+    SideBar.BackgroundTransparency = trans
+    Stroke.Color = accent
+    Logo.TextColor3 = accent
+    SectionTitle.TextColor3 = accent
+    CardContainer.ScrollBarImageColor3 = accent
+
+    for _, btn in ipairs(catButtons) do
+        btn.BackgroundColor3 = base
+        btn.TextColor3 = accent
+    end
+
+    OpenBtn.BackgroundColor3 = base
+    OpenBtn.TextColor3 = accent
+    OpenBorder.BackgroundColor3 = accent
+
+    for _, card in ipairs(CardContainer:GetChildren()) do
+        if card:IsA("Frame") then
+            card.BackgroundColor3 = base
+            card.BackgroundTransparency = 0.3
+            for _, child in ipairs(card:GetChildren()) do
+                if child:IsA("UIStroke") then child.Color = accent
+                elseif child:IsA("TextButton") and child.Text == "⚙" then child.BackgroundColor3 = accent end
+            end
+        end
+    end
+
+    for _, sf in ipairs(ScreenGui:GetChildren()) do
+        if sf:IsA("Frame") and sf.Name:sub(1,9) == "Settings_" then
+            sf.BackgroundColor3 = base
+            sf.BackgroundTransparency = trans
+            for _, child in ipairs(sf:GetChildren()) do
+                if child:IsA("TextLabel") then child.TextColor3 = accent
+                elseif child:IsA("Frame") and child:FindFirstChildOfClass("UICorner") then child.BackgroundColor3 = accent end
+            end
+        end
+    end
+
+    if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
+    for _, d in ipairs(espDiamonds) do
+        if d and d.Parent then d.Color = accent end
+    end
+end
+
 local function openSettings(title, sliders)
     local existing = ScreenGui:FindFirstChild("Settings_" .. title)
     if existing then existing:Destroy() return end
     local count = #sliders
     local h = 60 + count * 55
-    local SettingsFrame = Instance.new("Frame", ScreenGui)
-    SettingsFrame.Name = "Settings_" .. title
-    SettingsFrame.Size = UDim2.new(0, 320, 0, h)
-    SettingsFrame.Position = UDim2.new(0.5, -160, 0.5, -h/2)
-    SettingsFrame.BackgroundColor3 = getThemeColor()
-    SettingsFrame.BackgroundTransparency = getTransparency()
-    SettingsFrame.BorderSizePixel = 0
-    SettingsFrame.Active = true
-    local sfCorner = Instance.new("UICorner", SettingsFrame)
-    sfCorner.CornerRadius = UDim.new(0, 12)
-    registerThemeElement(SettingsFrame, "bg")
+    local SF = Instance.new("Frame", ScreenGui)
+    SF.Name = "Settings_" .. title
+    SF.Size = UDim2.new(0, 320, 0, h)
+    SF.Position = UDim2.new(0.5, -160, 0.5, -h/2)
+    SF.BackgroundColor3 = getThemeColor()
+    SF.BackgroundTransparency = getTransparency()
+    SF.BorderSizePixel = 0
+    SF.Active = true
+    local sfc = Instance.new("UICorner", SF)
+    sfc.CornerRadius = UDim.new(0, 12)
 
-    local sfTitle = Instance.new("TextLabel", SettingsFrame)
-    sfTitle.Size = UDim2.new(1, 0, 0, 30)
-    sfTitle.Position = UDim2.new(0, 0, 0, 10)
-    sfTitle.BackgroundTransparency = 1
-    sfTitle.Text = title
-    sfTitle.TextColor3 = getAccentColor()
-    sfTitle.TextSize = 15
-    sfTitle.Font = Enum.Font.GothamBold
-    registerThemeElement(sfTitle, "text")
+    local t = Instance.new("TextLabel", SF)
+    t.Size = UDim2.new(1, 0, 0, 30)
+    t.Position = UDim2.new(0, 0, 0, 10)
+    t.BackgroundTransparency = 1
+    t.Text = title
+    t.TextColor3 = getAccentColor()
+    t.TextSize = 15
+    t.Font = Enum.Font.GothamBold
 
-    local closeBtn = Instance.new("TextButton", SettingsFrame)
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.BackgroundTransparency = 1
-    closeBtn.Text = "✕"
-    closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-    closeBtn.TextSize = 18
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.MouseButton1Click:Connect(function() SettingsFrame:Destroy() end)
+    local closeB = Instance.new("TextButton", SF)
+    closeB.Size = UDim2.new(0, 30, 0, 30)
+    closeB.Position = UDim2.new(1, -35, 0, 5)
+    closeB.BackgroundTransparency = 1
+    closeB.Text = "✕"
+    closeB.TextColor3 = Color3.fromRGB(255, 100, 100)
+    closeB.TextSize = 18
+    closeB.Font = Enum.Font.GothamBold
+    closeB.MouseButton1Click:Connect(function() SF:Destroy() end)
 
     for i, s in ipairs(sliders) do
-        local yBase = 45 + (i - 1) * 55
+        local yB = 45 + (i-1) * 55
+        local lbl = Instance.new("TextLabel", SF)
+        lbl.Size = UDim2.new(0.9, 0, 0, 18)
+        lbl.Position = UDim2.new(0.05, 0, 0, yB)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = s.name .. ": " .. string.format("%.2f", s.default)
+        lbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+        lbl.TextSize = 12
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        local label = Instance.new("TextLabel", SettingsFrame)
-        label.Size = UDim2.new(0.9, 0, 0, 18)
-        label.Position = UDim2.new(0.05, 0, 0, yBase)
-        label.BackgroundTransparency = 1
-        label.Text = s.name .. ": " .. string.format("%.2f", s.default)
-        label.TextColor3 = Color3.fromRGB(220, 220, 220)
-        label.TextSize = 12
-        label.Font = Enum.Font.Gotham
-        label.TextXAlignment = Enum.TextXAlignment.Left
-
-        local slider = Instance.new("TextButton", SettingsFrame)
+        local slider = Instance.new("TextButton", SF)
         slider.Size = UDim2.new(0.9, 0, 0, 16)
-        slider.Position = UDim2.new(0.05, 0, 0, yBase + 22)
+        slider.Position = UDim2.new(0.05, 0, 0, yB + 22)
         slider.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
         slider.Text = ""
         slider.BorderSizePixel = 0
         slider.AutoButtonColor = false
-        local sCorner = Instance.new("UICorner", slider)
-        sCorner.CornerRadius = UDim.new(1, 0)
+        local sc = Instance.new("UICorner", slider)
+        sc.CornerRadius = UDim.new(1, 0)
 
         local fill = Instance.new("Frame", slider)
-        fill.Size = UDim2.new((s.default - s.min) / (s.max - s.min), 0, 1, 0)
+        fill.Size = UDim2.new((s.default-s.min)/(s.max-s.min), 0, 1, 0)
         fill.BackgroundColor3 = getAccentColor()
         fill.BorderSizePixel = 0
-        local fCorner = Instance.new("UICorner", fill)
-        fCorner.CornerRadius = UDim.new(1, 0)
-        registerThemeElement(fill, "accent")
+        local fc = Instance.new("UICorner", fill)
+        fc.CornerRadius = UDim.new(1, 0)
 
         local knob = Instance.new("Frame", slider)
         knob.Size = UDim2.new(0, 14, 1, 0)
-        knob.Position = UDim2.new((s.default - s.min) / (s.max - s.min), -7, 0, 0)
-        knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        knob.Position = UDim2.new((s.default-s.min)/(s.max-s.min), -7, 0, 0)
+        knob.BackgroundColor3 = Color3.new(1,1,1)
         knob.BorderSizePixel = 0
-        local kCorner = Instance.new("UICorner", knob)
-        kCorner.CornerRadius = UDim.new(1, 0)
+        local kc = Instance.new("UICorner", knob)
+        kc.CornerRadius = UDim.new(1, 0)
 
         local dragging = false
         local function updateFromInput(input)
@@ -589,7 +595,7 @@ local function openSettings(title, sliders)
                 fill.Size = UDim2.new(pos, 0, 1, 0)
                 knob.Position = UDim2.new(pos, -7, 0, 0)
                 local val = s.min + pos * (s.max - s.min)
-                label.Text = s.name .. ": " .. string.format("%.2f", val)
+                lbl.Text = s.name .. ": " .. string.format("%.2f", val)
                 s.callback(val)
                 SaveConfig()
             end
@@ -624,19 +630,17 @@ local function createCards(list)
         card.BorderSizePixel = 0
         local cc = Instance.new("UICorner", card)
         cc.CornerRadius = UDim.new(0, 10)
-        registerThemeElement(card, "bg")
 
         local stroke = Instance.new("UIStroke", card)
         stroke.Color = getAccentColor()
         stroke.Thickness = 1
-        registerThemeElement(stroke, "stroke")
 
         local title = Instance.new("TextLabel", card)
         title.Size = UDim2.new(1, -70, 0, 18)
         title.Position = UDim2.new(0, 8, 0, 5)
         title.BackgroundTransparency = 1
         title.Text = f.name
-        title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        title.TextColor3 = Color3.fromRGB(255,255,255)
         title.TextSize = 12
         title.Font = Enum.Font.GothamBold
         title.TextXAlignment = Enum.TextXAlignment.Left
@@ -647,7 +651,7 @@ local function createCards(list)
         desc.Position = UDim2.new(0, 8, 0, 26)
         desc.BackgroundTransparency = 1
         desc.Text = f.desc
-        desc.TextColor3 = Color3.fromRGB(180, 170, 210)
+        desc.TextColor3 = Color3.fromRGB(180,170,210)
         desc.TextSize = 10
         desc.Font = Enum.Font.Gotham
         desc.TextWrapped = true
@@ -659,19 +663,18 @@ local function createCards(list)
             setBtn.Position = UDim2.new(1, -50, 0, 5)
             setBtn.BackgroundColor3 = getAccentColor()
             setBtn.Text = "⚙"
-            setBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            setBtn.TextColor3 = Color3.new(1,1,1)
             setBtn.TextSize = 12
             setBtn.BorderSizePixel = 0
             local setCorner = Instance.new("UICorner", setBtn)
             setCorner.CornerRadius = UDim.new(0, 5)
-            registerThemeElement(setBtn, "accent")
             setBtn.MouseButton1Click:Connect(function() f.settings() end)
         end
 
         local toggle = Instance.new("TextButton", card)
         toggle.Size = UDim2.new(0, 26, 0, 14)
         toggle.Position = UDim2.new(1, -26, 0, 6)
-        toggle.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
+        toggle.BackgroundColor3 = Color3.fromRGB(50,40,80)
         toggle.Text = ""
         toggle.BorderSizePixel = 0
         local tc = Instance.new("UICorner", toggle)
@@ -680,7 +683,7 @@ local function createCards(list)
         local knob = Instance.new("Frame", toggle)
         knob.Size = UDim2.new(0, 10, 0, 10)
         knob.Position = UDim2.new(0, 2, 0.5, -5)
-        knob.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+        knob.BackgroundColor3 = Color3.fromRGB(200,200,200)
         knob.BorderSizePixel = 0
         local kc = Instance.new("UICorner", knob)
         kc.CornerRadius = UDim.new(1, 0)
@@ -698,106 +701,87 @@ local function createCards(list)
                     toggle.BackgroundColor3 = getAccentColor()
                     knob.Position = UDim2.new(1, -12, 0.5, -5)
                 else
-                    toggle.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
+                    toggle.BackgroundColor3 = Color3.fromRGB(50,40,80)
                     knob.Position = UDim2.new(0, 2, 0.5, -5)
                 end
                 SaveConfig()
             end
         end)
-        registerThemeElement(toggle, "accent")
     end
     task.wait()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
 -- ФУНКЦИИ
-local fovFunc = {name = "FOV", desc = "Меняет поле зрения.", getState = function() return settings.fovEnabled end,
-    settings = function() openSettings("FOV", {
-        {name = "FOV", min = 30, max = 120, default = settings.fovValue, callback = function(v) settings.fovValue = v ApplyFOV() end}
-    }) end,
-    callback = function(on) settings.fovEnabled = on ApplyFOV() end}
+local fovFunc = {name="FOV", desc="Меняет поле зрения.", getState=function() return settings.fovEnabled end,
+    settings=function() openSettings("FOV", {{name="FOV", min=30, max=120, default=settings.fovValue, callback=function(v) settings.fovValue=v ApplyFOV() end}}) end,
+    callback=function(on) settings.fovEnabled=on ApplyFOV() end}
 
-local stretchFunc = {name = "Растяг 4:3", desc = "Растягивает экран.", getState = function() return settings.stretchEnabled end,
-    settings = function() openSettings("Растяг", {
-        {name = "Фактор", min = 50, max = 100, default = settings.STRETCH_FACTOR * 100, callback = function(v)
-            settings.STRETCH_FACTOR = v / 100
-            stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1) end}
-    }) end,
-    callback = function(on) settings.stretchEnabled = on end}
+local stretchFunc = {name="Растяг", desc="Растягивает экран.", getState=function() return settings.stretchEnabled end,
+    settings=function() openSettings("Растяг", {{name="Фактор", min=50, max=100, default=settings.STRETCH_FACTOR*100, callback=function(v)
+        settings.STRETCH_FACTOR=v/100
+        stretchCFrame=CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1) end}}) end,
+    callback=function(on) settings.stretchEnabled=on end}
 
-local particlesFunc = {name = "Партиклы", desc = "Частицы при ходьбе.", getState = function() return settings.particlesEnabled end,
-    callback = function(on) settings.particlesEnabled = on ApplyParticles() end}
+local particlesFunc = {name="Партиклы", desc="Частицы при ходьбе.", getState=function() return settings.particlesEnabled end,
+    callback=function(on) settings.particlesEnabled=on ApplyParticles() end}
 
-local skyParticlesFunc = {name = "Партиклы неба", desc = "Ромбики в небе.", getState = function() return settings.skyParticlesEnabled end,
-    settings = function() openSettings("Партиклы неба", {
-        {name = "Плотность", min = 3, max = 30, default = settings.skyParticlesDensity, callback = function(v)
-            settings.skyParticlesDensity = math.floor(v)
-            if settings.skyParticlesEnabled then ApplySkyParticles() end end}
-    }) end,
-    callback = function(on) settings.skyParticlesEnabled = on ApplySkyParticles() end}
+local skyParticlesFunc = {name="Партиклы неба", desc="Ромбики в небе.", getState=function() return settings.skyParticlesEnabled end,
+    settings=function() openSettings("Партиклы неба", {{name="Плотность", min=3, max=30, default=settings.skyParticlesDensity, callback=function(v)
+        settings.skyParticlesDensity=math.floor(v)
+        if settings.skyParticlesEnabled then ApplySkyParticles() end end}}) end,
+    callback=function(on) settings.skyParticlesEnabled=on ApplySkyParticles() end}
 
-local trailsFunc = {name = "Movement Trails", desc = "Шлейф за игроком.", getState = function() return settings.trailsEnabled end,
-    settings = function() openSettings("Trails", {
-        {name = "Прозрачность", min = 0.1, max = 1, default = settings.trailsTransparency, callback = function(v) settings.trailsTransparency = v end}
-    }) end,
-    callback = function(on) settings.trailsEnabled = on ApplyTrails() end}
+local trailsFunc = {name="Movement Trails", desc="Шлейф за игроком.", getState=function() return settings.trailsEnabled end,
+    settings=function() openSettings("Trails", {{name="Прозрачность", min=0.1, max=1, default=settings.trailsTransparency, callback=function(v) settings.trailsTransparency=v end}}) end,
+    callback=function(on) settings.trailsEnabled=on ApplyTrails() end}
 
-local targetFunc = {name = "Target ESP", desc = "Ромбики на ближайшего (до 30м).", getState = function() return settings.targetESPEnabled end,
-    callback = function(on)
-        settings.targetESPEnabled = on
+local targetFunc = {name="Target ESP", desc="Ромбики на ближайшего (до 30м).", getState=function() return settings.targetESPEnabled end,
+    callback=function(on)
+        settings.targetESPEnabled=on
         if not on then
             for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
             espDiamonds = {}
         end
     end}
 
-local circleFunc = {name = "Волна при прыжке", desc = "Эффект капли при прыжке.", getState = function() return settings.landingCircleEnabled end,
-    settings = function()
+local circleFunc = {name="Волна при прыжке", desc="Эффект капли при прыжке.", getState=function() return settings.landingCircleEnabled end,
+    settings=function()
         openSettings("Волна при прыжке", {
-            {name = "Размер", min = 0.10, max = 5, default = settings.rippleSize, callback = function(v) settings.rippleSize = v end},
-            {name = "Прозрачность", min = 0, max = 1, default = settings.rippleTransparency, callback = function(v) settings.rippleTransparency = v end}
+            {name="Размер", min=0.10, max=5, default=settings.rippleSize, callback=function(v) settings.rippleSize=v end},
+            {name="Прозрачность", min=0, max=1, default=settings.rippleTransparency, callback=function(v) settings.rippleTransparency=v end}
         })
     end,
-    callback = function(on) settings.landingCircleEnabled = on end}
+    callback=function(on) settings.landingCircleEnabled=on end}
 
-local blurFunc = {name = "Motion Blur", desc = "Размытие при движении камеры.", getState = function() return settings.motionBlurEnabled end,
-    settings = function() openSettings("Motion Blur", {
-        {name = "Сила", min = 1, max = 10, default = settings.motionBlurAmount, callback = function(v) settings.motionBlurAmount = v end}
-    }) end,
-    callback = function(on) settings.motionBlurEnabled = on ApplyMotionBlur() end}
+local blurFunc = {name="Motion Blur", desc="Размытие при движении камеры.", getState=function() return settings.motionBlurEnabled end,
+    settings=function() openSettings("Motion Blur", {{name="Сила", min=1, max=10, default=settings.motionBlurAmount, callback=function(v) settings.motionBlurAmount=v end}}) end,
+    callback=function(on) settings.motionBlurEnabled=on ApplyMotionBlur() end}
 
-local fogFunc = {name = "Туман", desc = "Туман под цвет темы.", getState = function() return settings.fogEnabled end,
-    settings = function() openSettings("Туман", {
-        {name = "Дальность", min = 50, max = 1000, default = settings.fogEnd, callback = function(v) settings.fogEnd = v ApplyFog() end}
-    }) end,
-    callback = function(on) settings.fogEnabled = on ApplyFog() end}
+local fogFunc = {name="Туман", desc="Туман под цвет темы.", getState=function() return settings.fogEnabled end,
+    settings=function() openSettings("Туман", {{name="Дальность", min=50, max=1000, default=settings.fogEnd, callback=function(v) settings.fogEnd=v ApplyFog() end}}) end,
+    callback=function(on) settings.fogEnabled=on ApplyFog() end}
 
-local skyShaderFunc = {name = "Шейдер Скай", desc = "Меняет небо.", getState = function() return settings.skyShaderEnabled end,
-    callback = function(on) settings.skyShaderEnabled = on ApplySky() end}
+local skyShaderFunc = {name="Шейдер Скай", desc="Меняет небо.", getState=function() return settings.skyShaderEnabled end,
+    callback=function(on) settings.skyShaderEnabled=on ApplySky() end}
 
-local dayNightFunc = {name = "Ночь / День", desc = "Переключить время суток.", getState = function() return settings.dayNightEnabled end,
-    settings = function() openSettings("Ночь / День", {
-        {name = "Время", min = 0, max = 24, default = settings.dayNightTime, callback = function(v) settings.dayNightTime = v ApplyDayNight() end}
-    }) end,
-    callback = function(on) settings.dayNightEnabled = on ApplyDayNight() end}
+local dayNightFunc = {name="Ночь / День", desc="Переключить время суток.", getState=function() return settings.dayNightEnabled end,
+    settings=function() openSettings("Ночь / День", {{name="Время", min=0, max=24, default=settings.dayNightTime, callback=function(v) settings.dayNightTime=v ApplyDayNight() end}}) end,
+    callback=function(on) settings.dayNightEnabled=on ApplyDayNight() end}
 
-local rtxShadowsFunc = {name = "RTX Тени", desc = "Реалистичные тени + атмосфера.", getState = function() return settings.rtxShadowsEnabled end,
-    settings = function() openSettings("RTX Тени", {
-        {name = "Сила", min = 0.1, max = 1, default = settings.rtxShadowsIntensity, callback = function(v) settings.rtxShadowsIntensity = v ApplyRTX() end}
-    }) end,
-    callback = function(on) settings.rtxShadowsEnabled = on ApplyRTX() end}
+local rtxShadowsFunc = {name="RTX Тени", desc="Реалистичные тени + атмосфера.", getState=function() return settings.rtxShadowsEnabled end,
+    settings=function() openSettings("RTX Тени", {{name="Сила", min=0.1, max=1, default=settings.rtxShadowsIntensity, callback=function(v) settings.rtxShadowsIntensity=v ApplyRTX() end}}) end,
+    callback=function(on) settings.rtxShadowsEnabled=on ApplyRTX() end}
 
-local rtxReflectionsFunc = {name = "RTX Отражения", desc = "Реалистичные отражения.", getState = function() return settings.rtxReflectionsEnabled end,
-    callback = function(on) settings.rtxReflectionsEnabled = on ApplyRTX() end}
+local rtxReflectionsFunc = {name="RTX Отражения", desc="Реалистичные отражения.", getState=function() return settings.rtxReflectionsEnabled end,
+    callback=function(on) settings.rtxReflectionsEnabled=on ApplyRTX() end}
 
-local rtxAOFunc = {name = "RTX AO", desc = "Затенение окружения.", getState = function() return settings.rtxAOEnabled end,
-    settings = function() openSettings("RTX AO", {
-        {name = "Сила", min = 0.1, max = 1, default = settings.rtxAOIntensity, callback = function(v) settings.rtxAOIntensity = v ApplyRTX() end}
-    }) end,
-    callback = function(on) settings.rtxAOEnabled = on ApplyRTX() end}
+local rtxAOFunc = {name="RTX AO", desc="Затенение окружения.", getState=function() return settings.rtxAOEnabled end,
+    settings=function() openSettings("RTX AO", {{name="Сила", min=0.1, max=1, default=settings.rtxAOIntensity, callback=function(v) settings.rtxAOIntensity=v ApplyRTX() end}}) end,
+    callback=function(on) settings.rtxAOEnabled=on ApplyRTX() end}
 
-local headlessFunc = {name = "Headless", desc = "Голова уходит вниз — её не видно.", getState = function() return settings.headlessEnabled end,
-    callback = function(on) settings.headlessEnabled = on ApplyHeadless() end}
+local headlessFunc = {name="Headless", desc="Голова уходит вниз — её не видно.", getState=function() return settings.headlessEnabled end,
+    callback=function(on) settings.headlessEnabled=on ApplyHeadless() end}
 
 -- LOOPS
 RunService.Heartbeat:Connect(function()
@@ -993,7 +977,6 @@ local function showThemes()
     hueCard.BorderSizePixel = 0
     local hcCorner = Instance.new("UICorner", hueCard)
     hcCorner.CornerRadius = UDim.new(0, 10)
-    registerThemeElement(hueCard, "bg")
 
     local hueLabel = Instance.new("TextLabel", hueCard)
     hueLabel.Size = UDim2.new(1, 0, 0, 20)
@@ -1094,7 +1077,6 @@ OpenBorder.BorderSizePixel = 0
 OpenBorder.ZIndex = 1
 local obCorner = Instance.new("UICorner", OpenBorder)
 obCorner.CornerRadius = UDim.new(0, 14)
-registerThemeElement(OpenBorder, "accent")
 
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 216, 0, 56)
@@ -1110,8 +1092,6 @@ OpenBtn.TextWrapped = true
 OpenBtn.ZIndex = 2
 local oc = Instance.new("UICorner", OpenBtn)
 oc.CornerRadius = UDim.new(0, 12)
-registerThemeElement(OpenBtn, "bg")
-registerThemeElement(OpenBtn, "text")
 
 RunService.Heartbeat:Connect(function()
     OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | FPS: " .. fpsValue
