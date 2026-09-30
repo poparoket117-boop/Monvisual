@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v2)
+-- Monvisual GUI (Final v3)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -307,7 +307,7 @@ local function ApplyWings()
     end)
 end
 
--- ===== ИСПРАВЛЕННАЯ КИТАЙСКАЯ ШЛЯПА (по референсу) =====
+-- ===== ИСПРАВЛЕННАЯ КИТАЙСКАЯ ШЛЯПА (рабочая) =====
 local function ApplyHat()
     if hatCon then hatCon:Disconnect() hatCon = nil end
     if hatModel then hatModel:Destroy() hatModel = nil end
@@ -321,10 +321,10 @@ local function ApplyHat()
     hatModel.Name = "MonvisualHoloHat"
     hatModel.Parent = char
 
-    -- Основной конус (широкий, как в видео — классическая коническая шляпа)
+    -- === КОНУС (основа шляпы) ===
     local cone = Instance.new("Part")
-    cone.Shape = Enum.PartType.Cylinder
-    cone.Size = Vector3.new(0.1, 3.5, 3.5) -- очень плоский цилиндр для конуса
+    cone.Name = "Cone"
+    cone.Size = Vector3.new(3, 3, 3) -- базовый размер
     cone.Anchored = false
     cone.CanCollide = false
     cone.Material = Enum.Material.ForceField
@@ -332,38 +332,42 @@ local function ApplyHat()
     cone.Transparency = 0.3
     cone.Parent = hatModel
     
-    -- Используем Mesh для настоящего конуса
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.Cone
-    mesh.Scale = Vector3.new(0.85, 0.85, 0.85)
-    mesh.Parent = cone
+    -- Нормальный конус через CylinderMesh
+    local cm = Instance.new("CylinderMesh")
+    cm.TopScale = 0       -- верх сужается в точку
+    cm.BottomScale = 1    -- низ широкий
+    cm.Scale = Vector3.new(1, 1.2, 1)
+    cm.Parent = cone
     
     local weld1 = Instance.new("Weld")
     weld1.Part0 = head
     weld1.Part1 = cone
-    weld1.C0 = CFrame.new(0, 1.2, 0) * CFrame.Angles(0, 0, math.rad(90))
+    weld1.C0 = CFrame.new(0, 1.4, 0) * CFrame.Angles(0, 0, math.rad(90))
     weld1.Parent = cone
 
-    -- Широкие поля (плоский круг, как в видео)
+    -- === ШИРОКИЕ ПОЛЯ ===
     local brim = Instance.new("Part")
-    brim.Shape = Enum.PartType.Cylinder
-    brim.Size = Vector3.new(0.15, 4.5, 4.5) -- широкие поля
+    brim.Name = "Brim"
+    brim.Size = Vector3.new(0.3, 5, 5)
     brim.Anchored = false
     brim.CanCollide = false
     brim.Material = Enum.Material.ForceField
     brim.Color = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
-    brim.Transparency = 0.35
+    brim.Transparency = 0.3
     brim.Parent = hatModel
+    local bm = Instance.new("CylinderMesh")
+    bm.Parent = brim
     local weld2 = Instance.new("Weld")
     weld2.Part0 = head
     weld2.Part1 = brim
     weld2.C0 = CFrame.new(0, 0.9, 0) * CFrame.Angles(0, 0, math.rad(90))
     weld2.Parent = brim
 
-    -- Кисточка (небольшая сфера сверху конуса)
+    -- === КИСТОЧКА СВЕРХУ ===
     local tassel = Instance.new("Part")
+    tassel.Name = "Tassel"
     tassel.Shape = Enum.PartType.Ball
-    tassel.Size = Vector3.new(0.4, 0.4, 0.4)
+    tassel.Size = Vector3.new(0.5, 0.5, 0.5)
     tassel.Anchored = false
     tassel.CanCollide = false
     tassel.Material = Enum.Material.Neon
@@ -373,16 +377,17 @@ local function ApplyHat()
     local weld3 = Instance.new("Weld")
     weld3.Part0 = head
     weld3.Part1 = tassel
-    weld3.C0 = CFrame.new(0, 2.0, 0)
+    weld3.C0 = CFrame.new(0, 2.1, 0)
     weld3.Parent = tassel
 
-    -- Мерцание голограммы + цвет от темы
+    -- === МЕРЦАНИЕ ГОЛОГРАММЫ ===
     hatCon = RunService.Heartbeat:Connect(function()
         if not hatModel or not settings.hatEnabled then return end
+        if not hatModel.Parent then return end
         local t = tick()
         local flicker = 0.3 + math.sin(t * 8) * 0.1
         local holoColor = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
-        for _, p in ipairs(hatModel:GetDescendants()) do
+        for _, p in ipairs(hatModel:GetChildren()) do
             if p:IsA("BasePart") then
                 p.Transparency = flicker
                 p.Color = holoColor
@@ -503,23 +508,20 @@ local mainCorner = Instance.new("UICorner", Main)
 mainCorner.CornerRadius = UDim.new(0, 18)
 registerThemeElement(Main, "bg")
 
--- ===== НОВАЯ АНИМАЦИЯ ОТКРЫТИЯ (плавное раскрытие из центра с вращением) =====
+-- ===== ИСПРАВЛЕННАЯ АНИМАЦИЯ (по иконке: плавный подъём → плато) =====
 local function toggleMenu(show)
     if show then
         Main.Visible = true
         Main.Size = UDim2.new(0, 0, 0, 0)
         Main.Position = UDim2.new(0.5, 0, 0.5, 0)
-        Main.Rotation = -10
-        TweenService:Create(Main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        TweenService:Create(Main, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
             Size = UDim2.new(0, 700, 0, 420),
-            Position = UDim2.new(0.5, -350, 0.5, -210),
-            Rotation = 0
+            Position = UDim2.new(0.5, -350, 0.5, -210)
         }):Play()
     else
-        local tween = TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        local tween = TweenService:Create(Main, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.InOut), {
             Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0),
-            Rotation = 10
+            Position = UDim2.new(0.5, 0, 0.5, 0)
         })
         tween:Play()
         tween.Completed:Connect(function() Main.Visible = false end)
@@ -712,7 +714,8 @@ local function openSettings(title, min, max, default, callback)
         end
     end)
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then            dragging = false
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
         end
     end)
     UserInputService.InputChanged:Connect(function(input)
