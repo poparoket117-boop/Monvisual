@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v5)
+-- Monvisual GUI (Final v6)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -309,7 +309,7 @@ local function ApplyWings()
     end)
 end
 
--- ===== КИТАЙСКАЯ ШЛЯПА (EditableMesh) =====
+-- ===== КИТАЙСКАЯ ШЛЯПА (без "палки", только внешняя оболочка) =====
 local function ApplyHat()
     if hatCon then hatCon:Disconnect() hatCon = nil end
     if hatModel then hatModel:Destroy() hatModel = nil end
@@ -322,10 +322,9 @@ local function ApplyHat()
     local segments = 64
     local radiusBottom = 2.45
     local radiusTop = 0.32
-    local height = settings.hatHeight       -- регулировка
-    local wallThickness = 0.08
+    local height = settings.hatHeight
     local baseColor = Color3.fromHSV(themeHue / 360, settings.hatSaturation, 1)
-    local baseTransparency = settings.hatTransparency  -- регулировка
+    local baseTransparency = math.clamp(settings.hatTransparency, 0.05, 0.50)
 
     local success, mesh = pcall(function()
         return AssetService:CreateEditableMesh()
@@ -334,8 +333,6 @@ local function ApplyHat()
 
     local outerBottom = {}
     local outerTop = {}
-    local innerBottom = {}
-    local innerTop = {}
 
     for i = 0, segments - 1 do
         local angle = (i / segments) * math.pi * 2
@@ -350,36 +347,11 @@ local function ApplyHat()
         outerTop[i + 1] = mesh:AddVertex(Vector3.new(x, height, z))
     end
 
-    local innerBottomRadius = radiusBottom - wallThickness
-    local innerTopRadius = math.max(radiusTop - wallThickness, 0.05)
-
-    for i = 0, segments - 1 do
-        local angle = (i / segments) * math.pi * 2
-        local x = math.cos(angle) * innerBottomRadius
-        local z = math.sin(angle) * innerBottomRadius
-        innerBottom[i + 1] = mesh:AddVertex(Vector3.new(x, 0, z))
-    end
-    for i = 0, segments - 1 do
-        local angle = (i / segments) * math.pi * 2
-        local x = math.cos(angle) * innerTopRadius
-        local z = math.sin(angle) * innerTopRadius
-        innerTop[i + 1] = mesh:AddVertex(Vector3.new(x, height, z))
-    end
-
+    -- Только внешняя стенка (без внутренней, без "палки")
     for i = 1, segments do
         local nxt = (i % segments) + 1
         mesh:AddTriangle(outerBottom[i], outerBottom[nxt], outerTop[i])
         mesh:AddTriangle(outerBottom[nxt], outerTop[nxt], outerTop[i])
-    end
-    for i = 1, segments do
-        local nxt = (i % segments) + 1
-        mesh:AddTriangle(innerBottom[i], innerTop[i], innerBottom[nxt])
-        mesh:AddTriangle(innerBottom[nxt], innerTop[i], innerTop[nxt])
-    end
-    for i = 1, segments do
-        local nxt = (i % segments) + 1
-        mesh:AddTriangle(outerTop[i], outerTop[nxt], innerTop[i])
-        mesh:AddTriangle(outerTop[nxt], innerTop[nxt], innerTop[i])
     end
 
     local ok, cone = pcall(function()
@@ -437,7 +409,6 @@ local function ApplyHat()
     light.Range = 8
     light.Parent = brim
 
-    -- Мерцание
     hatCon = RunService.Heartbeat:Connect(function()
         if not hatModel or not settings.hatEnabled then return end
         if not hatModel.Parent then return end
@@ -567,7 +538,7 @@ local mainCorner = Instance.new("UICorner", Main)
 mainCorner.CornerRadius = UDim.new(0, 18)
 registerThemeElement(Main, "bg")
 
--- ===== АНИМАЦИЯ (исправлено только закрытие) =====
+-- ===== АНИМАЦИЯ (только закрытие изменено) =====
 local function toggleMenu(show)
     if show then
         Main.Visible = true
@@ -695,13 +666,17 @@ CardContainer.ChildRemoved:Connect(function()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end)
 
-local function openSettings(title, min, max, default, callback)
+-- ===== НАСТРОЙКИ В СТОЛБИК =====
+local function openSettings(title, sliders)
     local existing = ScreenGui:FindFirstChild("Settings_" .. title)
     if existing then existing:Destroy() return end
+
+    local count = #sliders
+    local h = 60 + count * 55
     local SettingsFrame = Instance.new("Frame", ScreenGui)
     SettingsFrame.Name = "Settings_" .. title
-    SettingsFrame.Size = UDim2.new(0, 300, 0, 150)
-    SettingsFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    SettingsFrame.Size = UDim2.new(0, 320, 0, h)
+    SettingsFrame.Position = UDim2.new(0.5, -160, 0.5, -h/2)
     SettingsFrame.BackgroundColor3 = getThemeColor()
     SettingsFrame.BackgroundTransparency = getTransparency()
     SettingsFrame.BorderSizePixel = 0
@@ -711,52 +686,18 @@ local function openSettings(title, min, max, default, callback)
     registerThemeElement(SettingsFrame, "bg")
 
     local sfTitle = Instance.new("TextLabel", SettingsFrame)
-    sfTitle.Size = UDim2.new(1, 0, 0, 25)
+    sfTitle.Size = UDim2.new(1, 0, 0, 30)
+    sfTitle.Position = UDim2.new(0, 0, 0, 10)
     sfTitle.BackgroundTransparency = 1
     sfTitle.Text = title
     sfTitle.TextColor3 = getAccentColor()
-    sfTitle.TextSize = 15
+    sfTitle.TextSize = 16
     sfTitle.Font = Enum.Font.GothamBold
     registerThemeElement(sfTitle, "text")
 
-    local slider = Instance.new("TextButton", SettingsFrame)
-    slider.Size = UDim2.new(0.8, 0, 0, 20)
-    slider.Position = UDim2.new(0.1, 0, 0.4, 0)
-    slider.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
-    slider.Text = ""
-    slider.BorderSizePixel = 0
-    slider.AutoButtonColor = false
-    local sCorner = Instance.new("UICorner", slider)
-    sCorner.CornerRadius = UDim.new(1, 0)
-
-    local fill = Instance.new("Frame", slider)
-    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    fill.BackgroundColor3 = getAccentColor()
-    fill.BorderSizePixel = 0
-    local fCorner = Instance.new("UICorner", fill)
-    fCorner.CornerRadius = UDim.new(1, 0)
-    registerThemeElement(fill, "accent")
-
-    local knob = Instance.new("Frame", slider)
-    knob.Size = UDim2.new(0, 16, 1, 0)
-    knob.Position = UDim2.new((default - min) / (max - min), -8, 0, 0)
-    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    knob.BorderSizePixel = 0
-    local kCorner = Instance.new("UICorner", knob)
-    kCorner.CornerRadius = UDim.new(1, 0)
-
-    local valueLabel = Instance.new("TextLabel", SettingsFrame)
-    valueLabel.Size = UDim2.new(1, 0, 0, 20)
-    valueLabel.Position = UDim2.new(0, 0, 0.65, 0)
-    valueLabel.BackgroundTransparency = 1
-    valueLabel.Text = "Значение: " .. string.format("%.2f", default)
-    valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    valueLabel.TextSize = 13
-    valueLabel.Font = Enum.Font.Gotham
-
     local closeBtn = Instance.new("TextButton", SettingsFrame)
     closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 2)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
     closeBtn.BackgroundTransparency = 1
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -764,36 +705,77 @@ local function openSettings(title, min, max, default, callback)
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.MouseButton1Click:Connect(function() SettingsFrame:Destroy() end)
 
-    local dragging = false
-    local function updateFromInput(input)
-        local x = input.Position.X
-        local absX = slider.AbsolutePosition.X
-        local sizeX = slider.AbsoluteSize.X
-        if sizeX > 0 then
-            local pos = math.clamp((x - absX) / sizeX, 0, 1)
-            fill.Size = UDim2.new(pos, 0, 1, 0)
-            knob.Position = UDim2.new(pos, -8, 0, 0)
-            local val = min + pos * (max - min)
-            valueLabel.Text = "Значение: " .. string.format("%.2f", val)
-            callback(val)
-            SaveConfig()
+    for i, s in ipairs(sliders) do
+        local yBase = 45 + (i - 1) * 55
+
+        local label = Instance.new("TextLabel", SettingsFrame)
+        label.Size = UDim2.new(0.9, 0, 0, 18)
+        label.Position = UDim2.new(0.05, 0, 0, yBase)
+        label.BackgroundTransparency = 1
+        label.Text = s.name .. ": " .. string.format("%.2f", s.default)
+        label.TextColor3 = Color3.fromRGB(220, 220, 220)
+        label.TextSize = 12
+        label.Font = Enum.Font.Gotham
+        label.TextXAlignment = Enum.TextXAlignment.Left
+
+        local slider = Instance.new("TextButton", SettingsFrame)
+        slider.Size = UDim2.new(0.9, 0, 0, 16)
+        slider.Position = UDim2.new(0.05, 0, 0, yBase + 22)
+        slider.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
+        slider.Text = ""
+        slider.BorderSizePixel = 0
+        slider.AutoButtonColor = false
+        local sCorner = Instance.new("UICorner", slider)
+        sCorner.CornerRadius = UDim.new(1, 0)
+
+        local fill = Instance.new("Frame", slider)
+        fill.Size = UDim2.new((s.default - s.min) / (s.max - s.min), 0, 1, 0)
+        fill.BackgroundColor3 = getAccentColor()
+        fill.BorderSizePixel = 0
+        local fCorner = Instance.new("UICorner", fill)
+        fCorner.CornerRadius = UDim.new(1, 0)
+        registerThemeElement(fill, "accent")
+
+        local knob = Instance.new("Frame", slider)
+        knob.Size = UDim2.new(0, 14, 1, 0)
+        knob.Position = UDim2.new((s.default - s.min) / (s.max - s.min), -7, 0, 0)
+        knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        knob.BorderSizePixel = 0
+        local kCorner = Instance.new("UICorner", knob)
+        kCorner.CornerRadius = UDim.new(1, 0)
+
+        local dragging = false
+        local function updateFromInput(input)
+            local x = input.Position.X
+            local absX = slider.AbsolutePosition.X
+            local sizeX = slider.AbsoluteSize.X
+            if sizeX > 0 then
+                local pos = math.clamp((x - absX) / sizeX, 0, 1)
+                fill.Size = UDim2.new(pos, 0, 1, 0)
+                knob.Position = UDim2.new(pos, -7, 0, 0)
+                local val = s.min + pos * (s.max - s.min)
+                label.Text = s.name .. ": " .. string.format("%.2f", val)
+                s.callback(val)
+                SaveConfig()
+            end
         end
+        slider.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                updateFromInput(input)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+                updateFromInput(input)
+            end
+        end)
     end
-    slider.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true updateFromInput(input)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-            updateFromInput(input)
-        end
-    end)
 end
 
 local function createCards(list)
@@ -894,26 +876,34 @@ end
 
 -- ФУНКЦИИ
 local fovFunc = {name = "FOV", desc = "Меняет поле зрения.", getState = function() return settings.fovEnabled end,
-    settings = function() openSettings("FOV", 30, 120, settings.fovValue, function(v) settings.fovValue = v ApplyFOV() end) end,
+    settings = function() openSettings("FOV", {
+        {name = "FOV", min = 30, max = 120, default = settings.fovValue, callback = function(v) settings.fovValue = v ApplyFOV() end}
+    }) end,
     callback = function(on) settings.fovEnabled = on ApplyFOV() end}
 
 local stretchFunc = {name = "Растяг 4:3", desc = "Растягивает экран.", getState = function() return settings.stretchEnabled end,
-    settings = function() openSettings("Растяг", 50, 100, settings.STRETCH_FACTOR * 100, function(v)
-        settings.STRETCH_FACTOR = v / 100
-        stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1) end) end,
+    settings = function() openSettings("Растяг", {
+        {name = "Фактор", min = 50, max = 100, default = settings.STRETCH_FACTOR * 100, callback = function(v)
+            settings.STRETCH_FACTOR = v / 100
+            stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1) end}
+    }) end,
     callback = function(on) settings.stretchEnabled = on end}
 
 local particlesFunc = {name = "Партиклы", desc = "Частицы при ходьбе.", getState = function() return settings.particlesEnabled end,
     callback = function(on) settings.particlesEnabled = on ApplyParticles() end}
 
 local skyParticlesFunc = {name = "Партиклы неба", desc = "Ромбики в небе.", getState = function() return settings.skyParticlesEnabled end,
-    settings = function() openSettings("Плотность", 3, 30, settings.skyParticlesDensity, function(v)
-        settings.skyParticlesDensity = math.floor(v)
-        if settings.skyParticlesEnabled then ApplySkyParticles() end end) end,
+    settings = function() openSettings("Партиклы неба", {
+        {name = "Плотность", min = 3, max = 30, default = settings.skyParticlesDensity, callback = function(v)
+            settings.skyParticlesDensity = math.floor(v)
+            if settings.skyParticlesEnabled then ApplySkyParticles() end end}
+    }) end,
     callback = function(on) settings.skyParticlesEnabled = on ApplySkyParticles() end}
 
 local trailsFunc = {name = "Movement Trails", desc = "Шлейф за игроком.", getState = function() return settings.trailsEnabled end,
-    settings = function() openSettings("Прозрачность", 0.1, 1, settings.trailsTransparency, function(v) settings.trailsTransparency = v end) end,
+    settings = function() openSettings("Trails", {
+        {name = "Прозрачность", min = 0.1, max = 1, default = settings.trailsTransparency, callback = function(v) settings.trailsTransparency = v end}
+    }) end,
     callback = function(on) settings.trailsEnabled = on ApplyTrails() end}
 
 local targetFunc = {name = "Target ESP", desc = "Ромбики на ближайшего (до 30м).", getState = function() return settings.targetESPEnabled end,
@@ -999,48 +989,64 @@ end)
 
 local circleFunc = {name = "Волна при прыжке", desc = "Эффект капли при прыжке.", getState = function() return settings.landingCircleEnabled end,
     settings = function()
-        openSettings("Размер волны", 0.10, 5, settings.rippleSize, function(v) settings.rippleSize = v end)
-        openSettings("Прозрачность волны", 0, 1, settings.rippleTransparency, function(v) settings.rippleTransparency = v end)
+        openSettings("Волна при прыжке", {
+            {name = "Размер", min = 0.10, max = 5, default = settings.rippleSize, callback = function(v) settings.rippleSize = v end},
+            {name = "Прозрачность", min = 0, max = 1, default = settings.rippleTransparency, callback = function(v) settings.rippleTransparency = v end}
+        })
     end,
     callback = function(on) settings.landingCircleEnabled = on end}
 
 local blurFunc = {name = "Motion Blur", desc = "Размытие при движении камеры.", getState = function() return settings.motionBlurEnabled end,
-    settings = function() openSettings("Сила размытия", 1, 10, settings.motionBlurAmount, function(v) settings.motionBlurAmount = v end) end,
+    settings = function() openSettings("Motion Blur", {
+        {name = "Сила", min = 1, max = 10, default = settings.motionBlurAmount, callback = function(v) settings.motionBlurAmount = v end}
+    }) end,
     callback = function(on) settings.motionBlurEnabled = on ApplyMotionBlur() end}
 
 local fogFunc = {name = "Туман", desc = "Туман под цвет темы.", getState = function() return settings.fogEnabled end,
-    settings = function() openSettings("Дальность тумана", 50, 1000, settings.fogEnd, function(v) settings.fogEnd = v ApplyFog() end) end,
+    settings = function() openSettings("Туман", {
+        {name = "Дальность", min = 50, max = 1000, default = settings.fogEnd, callback = function(v) settings.fogEnd = v ApplyFog() end}
+    }) end,
     callback = function(on) settings.fogEnabled = on ApplyFog() end}
 
 local skyShaderFunc = {name = "Шейдер Скай", desc = "Меняет небо.", getState = function() return settings.skyShaderEnabled end,
     callback = function(on) settings.skyShaderEnabled = on ApplySky() end}
 
 local dayNightFunc = {name = "Ночь / День", desc = "Переключить время суток.", getState = function() return settings.dayNightEnabled end,
-    settings = function() openSettings("Время (0-24)", 0, 24, settings.dayNightTime, function(v) settings.dayNightTime = v ApplyDayNight() end) end,
+    settings = function() openSettings("Ночь / День", {
+        {name = "Время", min = 0, max = 24, default = settings.dayNightTime, callback = function(v) settings.dayNightTime = v ApplyDayNight() end}
+    }) end,
     callback = function(on) settings.dayNightEnabled = on ApplyDayNight() end}
 
 local rtxShadowsFunc = {name = "RTX Тени", desc = "Реалистичные тени + атмосфера.", getState = function() return settings.rtxShadowsEnabled end,
-    settings = function() openSettings("Сила теней", 0.1, 1, settings.rtxShadowsIntensity, function(v) settings.rtxShadowsIntensity = v ApplyRTX() end) end,
+    settings = function() openSettings("RTX Тени", {
+        {name = "Сила", min = 0.1, max = 1, default = settings.rtxShadowsIntensity, callback = function(v) settings.rtxShadowsIntensity = v ApplyRTX() end}
+    }) end,
     callback = function(on) settings.rtxShadowsEnabled = on ApplyRTX() end}
 
 local rtxReflectionsFunc = {name = "RTX Отражения", desc = "Реалистичные отражения.", getState = function() return settings.rtxReflectionsEnabled end,
     callback = function(on) settings.rtxReflectionsEnabled = on ApplyRTX() end}
 
 local rtxAOFunc = {name = "RTX AO", desc = "Затенение окружения.", getState = function() return settings.rtxAOEnabled end,
-    settings = function() openSettings("Сила AO", 0.1, 1, settings.rtxAOIntensity, function(v) settings.rtxAOIntensity = v ApplyRTX() end) end,
+    settings = function() openSettings("RTX AO", {
+        {name = "Сила", min = 0.1, max = 1, default = settings.rtxAOIntensity, callback = function(v) settings.rtxAOIntensity = v ApplyRTX() end}
+    }) end,
     callback = function(on) settings.rtxAOEnabled = on ApplyRTX() end}
 
 local wingsFunc = {name = "Крылья", desc = "Анимированные крылья.", getState = function() return settings.wingsEnabled end,
-    settings = function() openSettings("Цвет крыльев (HUE)", 0, 360, 270, function(v)
-        settings.wingsColor = Color3.fromHSV(v/360, 0.8, 1)
-        if wingsModel then for _, p in ipairs(wingsModel:GetDescendants()) do if p:IsA("BasePart") then p.Color = settings.wingsColor end end end end) end,
+    settings = function() openSettings("Крылья", {
+        {name = "HUE", min = 0, max = 360, default = 270, callback = function(v)
+            settings.wingsColor = Color3.fromHSV(v/360, 0.8, 1)
+            if wingsModel then for _, p in ipairs(wingsModel:GetDescendants()) do if p:IsA("BasePart") then p.Color = settings.wingsColor end end end end}
+    }) end,
     callback = function(on) settings.wingsEnabled = on ApplyWings() end}
 
-local hatFunc = {name = "Китайская шляпа (голограмма)", desc = "Неоновый конус с полыми стенками.", getState = function() return settings.hatEnabled end,
+local hatFunc = {name = "Китайская шляпа (голограмма)", desc = "Неоновый конус с широкими полями.", getState = function() return settings.hatEnabled end,
     settings = function()
-        openSettings("Высота шляпы", 0.5, 4, settings.hatHeight, function(v) settings.hatHeight = v ApplyHat() end)
-        openSettings("Прозрачность", 0.05, 0.50, settings.hatTransparency, function(v) settings.hatTransparency = v ApplyHat() end)
-        openSettings("Насыщенность", 0, 1, settings.hatSaturation, function(v) settings.hatSaturation = v end)
+        openSettings("Китайская шляпа", {
+            {name = "Высота", min = 0.5, max = 4, default = settings.hatHeight, callback = function(v) settings.hatHeight = v ApplyHat() end},
+            {name = "Прозрачность", min = 0.05, max = 0.50, default = settings.hatTransparency, callback = function(v) settings.hatTransparency = v ApplyHat() end},
+            {name = "Насыщенность", min = 0, max = 1, default = settings.hatSaturation, callback = function(v) settings.hatSaturation = v end}
+        })
     end,
     callback = function(on) settings.hatEnabled = on ApplyHat() end}
 
