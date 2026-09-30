@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v19)
+-- Monvisual GUI (Final v20)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -50,7 +50,6 @@ local settings = {
     headlessEnabled = false,
     rtxShadowsEnabled = false, rtxShadowsIntensity = 0.7,
     rtxReflectionsEnabled = false,
-    rtxAOEnabled = false, rtxAOIntensity = 0.6,
     dayNightEnabled = false, dayNightTime = 12
 }
 
@@ -302,20 +301,6 @@ local function ApplyRTX()
         Lighting.EnvironmentDiffuseScale = 0
         Lighting.EnvironmentSpecularScale = 0
     end
-    if settings.rtxAOEnabled then
-        local ao = Lighting:FindFirstChild("MonvisualAO")
-        if not ao then
-            ao = Instance.new("ColorCorrectionEffect")
-            ao.Name = "MonvisualAO"
-            ao.Parent = Lighting
-        end
-        ao.Contrast = settings.rtxAOIntensity
-        ao.Brightness = -0.15
-        ao.Saturation = -0.1
-    else
-        local ao = Lighting:FindFirstChild("MonvisualAO")
-        if ao then ao:Destroy() end
-    end
 end
 local function ApplyDayNight()
     if settings.dayNightEnabled then
@@ -498,12 +483,12 @@ local function updateTheme()
         btn.TextColor3 = textCol
     end
 
-    -- Кнопка входа: обводка меняется с темой, текст всегда белый
+    -- Кнопка входа: обводка меняется, текст всегда белый
     OpenBtn.BackgroundTransparency = 0.85
     OpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     if OpenStroke then OpenStroke.Color = accent end
 
-    -- Эффекты перекрашиваются
+    -- Эффекты
     if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
     for _, d in ipairs(espDiamonds) do
         if d and d.Parent then d.Color = accent end
@@ -798,10 +783,6 @@ local rtxShadowsFunc = {name="RTX Тени", desc="Реалистичные те
 local rtxReflectionsFunc = {name="RTX Отражения", desc="Реалистичные отражения.", getState=function() return settings.rtxReflectionsEnabled end,
     callback=function(on) settings.rtxReflectionsEnabled=on ApplyRTX() end}
 
-local rtxAOFunc = {name="RTX AO", desc="Затенение окружения.", getState=function() return settings.rtxAOEnabled end,
-    settings=function() openSettings("RTX AO", {{name="Сила", min=0.1, max=1, default=settings.rtxAOIntensity, callback=function(v) settings.rtxAOIntensity=v ApplyRTX() end}}) end,
-    callback=function(on) settings.rtxAOEnabled=on ApplyRTX() end}
-
 local headlessFunc = {name="Headless", desc="Голова уходит вниз — её не видно.", getState=function() return settings.headlessEnabled end,
     callback=function(on) settings.headlessEnabled=on ApplyHeadless() end}
 
@@ -1070,7 +1051,7 @@ catButtons[2].MouseButton1Click:Connect(function()
 end)
 catButtons[3].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Шейдеры"
-    createCards({rtxShadowsFunc, rtxReflectionsFunc, rtxAOFunc})
+    createCards({rtxShadowsFunc, rtxReflectionsFunc})
 end)
 catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
