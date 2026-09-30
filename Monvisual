@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v13)
+-- Monvisual GUI (Final v14)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -16,21 +16,20 @@ local Camera = workspace.CurrentCamera
 
 local themeHue = 270
 local themeCustomColor = nil
-local themeCustomTransparency = nil
 
 local function getThemeColor()
-    if themeCustomColor then return themeCustomColor end
-    return Color3.fromHSV(themeHue / 360, 0.6, 0.15)
+    return Color3.fromRGB(20, 20, 30)
 end
+
 local function getAccentColor()
     if themeCustomColor then
         return Color3.new(math.min(themeCustomColor.R + 0.5, 1), math.min(themeCustomColor.G + 0.5, 1), math.min(themeCustomColor.B + 0.5, 1))
     end
     return Color3.fromHSV(themeHue / 360, 0.7, 0.9)
 end
+
 local function getTransparency()
-    if themeCustomTransparency then return themeCustomTransparency end
-    return 0.3
+    return 0.85
 end
 
 local settings = {
@@ -48,8 +47,7 @@ local settings = {
     rtxShadowsEnabled = false, rtxShadowsIntensity = 0.7,
     rtxReflectionsEnabled = false,
     rtxAOEnabled = false, rtxAOIntensity = 0.6,
-    dayNightEnabled = false, dayNightTime = 12,
-    themeHue = 270
+    dayNightEnabled = false, dayNightTime = 12
 }
 
 local CONFIG_FILE = "Monvisual_config.json"
@@ -93,31 +91,6 @@ RunService.RenderStepped:Connect(function()
         fpsTimer = tick()
     end
 end)
-
-local themeElements = {}
-local function registerThemeElement(obj, prop)
-    table.insert(themeElements, {obj = obj, prop = prop})
-end
-
-local function updateTheme()
-    local accent = getAccentColor()
-    local trans = getTransparency()
-    for _, item in ipairs(themeElements) do
-        if item.obj and item.obj.Parent then
-            if item.prop == "bg" then
-                -- ФОН НЕ МЕНЯЕТСЯ — только прозрачность фиксирована
-                item.obj.BackgroundTransparency = trans
-            elseif item.prop == "accent" then item.obj.BackgroundColor3 = accent
-            elseif item.prop == "text" then item.obj.TextColor3 = accent
-            elseif item.prop == "stroke" then item.obj.Color = accent
-            end
-        end
-    end
-    if particleEmitter then particleEmitter.Color = ColorSequence.new(accent) end
-    for _, d in ipairs(espDiamonds) do
-        if d and d.Parent then d.Color = accent end
-    end
-end
 
 local function ApplyStretch()
     if settings.stretchEnabled then Camera.CFrame = Camera.CFrame * stretchCFrame end
@@ -239,7 +212,7 @@ local function ApplyTrails()
     end
 end
 
--- ===== HEADLESS (твой способ, но переопределяем в Stepped) =====
+-- ===== HEADLESS через Neck.C0 (без провала под землю) =====
 local function ApplyHeadless()
     if headlessConnection then headlessConnection:Disconnect() headlessConnection = nil end
     if settings.headlessEnabled then
@@ -249,8 +222,11 @@ local function ApplyHeadless()
             if not char then return end
             local head = char:FindFirstChild("Head")
             if not head then return end
-            head.CFrame = head.CFrame + Vector3.new(0, -0.5, 0)
+            local neck = head:FindFirstChildOfClass("Motor6D")
+            if not neck then return end
+            neck.C0 = CFrame.new(0, -3, 0) * CFrame.Angles(math.rad(-90), 0, math.rad(180))
             head.Transparency = 1
+            head.LocalTransparencyModifier = 1
             for _, obj in ipairs(head:GetChildren()) do
                 if obj:IsA("Decal") then obj.Transparency = 1 end
             end
@@ -260,7 +236,12 @@ local function ApplyHeadless()
         if char then
             local head = char:FindFirstChild("Head")
             if head then
+                local neck = head:FindFirstChildOfClass("Motor6D")
+                if neck then
+                    neck.C0 = CFrame.new(0, 1, 0) * CFrame.Angles(math.rad(-90), 0, math.rad(180))
+                end
                 head.Transparency = 0
+                head.LocalTransparencyModifier = 0
                 for _, obj in ipairs(head:GetChildren()) do
                     if obj:IsA("Decal") then obj.Transparency = 0 end
                 end
@@ -420,7 +401,7 @@ for _, name in ipairs(categories) do
     btn.Size = UDim2.new(0.85, 0, 0, 30)
     btn.Position = UDim2.new(0.075, 0, 0, catY)
     btn.BackgroundColor3 = getThemeColor()
-    btn.BackgroundTransparency = 0.3
+    btn.BackgroundTransparency = 0.5
     btn.TextColor3 = getAccentColor()
     btn.Text = "◆ " .. name
     btn.TextSize = 13
@@ -490,12 +471,11 @@ CardContainer.ChildRemoved:Connect(function()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- ===== ОБНОВЛЕНИЕ ТЕМЫ (меняется ТОЛЬКО обводка/текст/акценты, фон остаётся) =====
+-- ===== ОБНОВЛЕНИЕ ТЕМЫ (меняется ТОЛЬКО обводка/текст, фон всегда прозрачный) =====
 local function updateTheme()
     local accent = getAccentColor()
     local trans = getTransparency()
 
-    -- фон НЕ трогаем
     Main.BackgroundTransparency = trans
     SideBar.BackgroundTransparency = trans
     Stroke.Color = accent
@@ -504,7 +484,7 @@ local function updateTheme()
     CardContainer.ScrollBarImageColor3 = accent
 
     for _, btn in ipairs(catButtons) do
-        btn.BackgroundTransparency = 0.3
+        btn.BackgroundTransparency = 0.5
         btn.TextColor3 = accent
     end
 
@@ -513,7 +493,7 @@ local function updateTheme()
 
     for _, card in ipairs(CardContainer:GetChildren()) do
         if card:IsA("Frame") then
-            card.BackgroundTransparency = 0.3
+            card.BackgroundTransparency = 0.5
             for _, child in ipairs(card:GetChildren()) do
                 if child:IsA("UIStroke") then child.Color = accent
                 elseif child:IsA("TextButton") and child.Text == "⚙" then child.BackgroundColor3 = accent end
@@ -650,7 +630,7 @@ local function createCards(list)
     for i, f in ipairs(list) do
         local card = Instance.new("Frame", CardContainer)
         card.BackgroundColor3 = getThemeColor()
-        card.BackgroundTransparency = 0.3
+        card.BackgroundTransparency = 0.5
         card.BorderSizePixel = 0
         local cc = Instance.new("UICorner", card)
         cc.CornerRadius = UDim.new(0, 10)
@@ -951,8 +931,7 @@ local baseThemes = {
     {name = "Зелёная", hue = 120},
     {name = "Розовая", hue = 320},
     {name = "Голубая", hue = 190},
-    {name = "Жёлтая", hue = 50},
-    {name = "Прозрачная", custom = Color3.fromRGB(30, 30, 40), transparent = 0.7}
+    {name = "Жёлтая", hue = 50}
 }
 
 local function showThemes()
@@ -962,17 +941,20 @@ local function showThemes()
     SectionTitle.Text = "Темы"
     for i, t in ipairs(baseThemes) do
         local card = Instance.new("Frame", CardContainer)
-        card.BackgroundColor3 = t.custom or Color3.fromHSV(t.hue / 360, 0.6, 0.15)
-        card.BackgroundTransparency = t.transparent or 0.3
+        card.BackgroundColor3 = getThemeColor()
+        card.BackgroundTransparency = 0.5
         card.BorderSizePixel = 0
         local cc = Instance.new("UICorner", card)
         cc.CornerRadius = UDim.new(0, 10)
+        local stroke = Instance.new("UIStroke", card)
+        stroke.Color = Color3.fromHSV(t.hue / 360, 0.7, 0.9)
+        stroke.Thickness = 2
         local title = Instance.new("TextLabel", card)
         title.Size = UDim2.new(1, 0, 0, 20)
         title.Position = UDim2.new(0, 0, 0.2, 0)
         title.BackgroundTransparency = 1
         title.Text = t.name
-        title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        title.TextColor3 = Color3.fromHSV(t.hue / 360, 0.7, 0.9)
         title.TextSize = 14
         title.Font = Enum.Font.GothamBold
         local btn = Instance.new("TextButton", card)
@@ -980,15 +962,8 @@ local function showThemes()
         btn.BackgroundTransparency = 1
         btn.Text = ""
         btn.MouseButton1Click:Connect(function()
-            if t.custom then
-                themeCustomColor = t.custom
-                themeCustomTransparency = t.transparent
-                themeHue = 0
-            else
-                themeCustomColor = nil
-                themeCustomTransparency = nil
-                themeHue = t.hue
-            end
+            themeCustomColor = nil
+            themeHue = t.hue
             updateTheme()
             SaveConfig()
         end)
@@ -997,10 +972,13 @@ local function showThemes()
     local hueCard = Instance.new("Frame", CardContainer)
     hueCard.Size = UDim2.new(0.96, 0, 0, 100)
     hueCard.BackgroundColor3 = getThemeColor()
-    hueCard.BackgroundTransparency = 0.3
+    hueCard.BackgroundTransparency = 0.5
     hueCard.BorderSizePixel = 0
     local hcCorner = Instance.new("UICorner", hueCard)
     hcCorner.CornerRadius = UDim.new(0, 10)
+    local hcStroke = Instance.new("UIStroke", hueCard)
+    hcStroke.Color = getAccentColor()
+    hcStroke.Thickness = 2
 
     local hueLabel = Instance.new("TextLabel", hueCard)
     hueLabel.Size = UDim2.new(1, 0, 0, 20)
@@ -1049,7 +1027,6 @@ local function showThemes()
             local pos = math.clamp((x - absX) / sizeX, 0, 1)
             themeHue = math.floor(pos * 360)
             themeCustomColor = nil
-            themeCustomTransparency = nil
             hueLabel.Text = "Свой оттенок: " .. themeHue
             knob.Position = UDim2.new(pos, -9, 0.5, -9)
             updateTheme()
@@ -1106,7 +1083,7 @@ local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 216, 0, 56)
 OpenBtn.Position = UDim2.new(0.5, -108, 0.001, 0)
 OpenBtn.BackgroundColor3 = getThemeColor()
-OpenBtn.BackgroundTransparency = 0
+OpenBtn.BackgroundTransparency = 0.5
 OpenBtn.TextColor3 = getAccentColor()
 OpenBtn.TextSize = 13
 OpenBtn.Font = Enum.Font.GothamBold
