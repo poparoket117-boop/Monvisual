@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v9)
+-- Monvisual GUI (Final v10)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -81,7 +81,7 @@ local espAngle = 0
 local espTargetCFrame = nil
 local lastCameraCFrame = Camera.CFrame
 local skyParticleFolder, trailFolder, trailCon
-local headlessCon
+local headlessConnection = nil
 
 local fpsValue = 60
 local fpsCounter = 0
@@ -241,28 +241,30 @@ local function ApplyTrails()
     end
 end
 
--- ===== HEADLESS (твой способ через neck.Transform) =====
+-- ===== HEADLESS (через neck.Transform в Stepped — перекрывает анимации) =====
 local function ApplyHeadless()
-    if headlessCon then headlessCon:Disconnect() headlessCon = nil end
-    local char = Player.Character
-    if not char then return end
-    local upperTorso = char:FindFirstChild("UpperTorso")
-    if not upperTorso then return end
-    local neck = upperTorso:FindFirstChild("Neck")
-    if not neck then return end
+    if headlessConnection then headlessConnection:Disconnect() headlessConnection = nil end
     if settings.headlessEnabled then
-        neck.Transform = CFrame.new(0, -5, 0)
-        headlessCon = RunService.Heartbeat:Connect(function()
+        headlessConnection = RunService.Stepped:Connect(function()
             if not settings.headlessEnabled then return end
-            local c = Player.Character
-            if not c then return end
-            local ut = c:FindFirstChild("UpperTorso")
-            if not ut then return end
-            local n = ut:FindFirstChild("Neck")
-            if n then n.Transform = CFrame.new(0, -5, 0) end
+            local char = Player.Character
+            if not char then return end
+            local upperTorso = char:FindFirstChild("UpperTorso")
+            if not upperTorso then return end
+            local neck = upperTorso:FindFirstChild("Neck")
+            if neck then
+                neck.Transform = CFrame.new(0, -5, 0)
+            end
         end)
     else
-        neck.Transform = CFrame.new(0, 0, 0)
+        local char = Player.Character
+        if char then
+            local ut = char:FindFirstChild("UpperTorso")
+            if ut then
+                local n = ut:FindFirstChild("Neck")
+                if n then n.Transform = CFrame.new(0, 0, 0) end
+            end
+        end
     end
 end
 
@@ -414,16 +416,11 @@ registerThemeElement(SideBar, "bg")
 local Logo = Instance.new("TextLabel", SideBar)
 Logo.Size = UDim2.new(1, 0, 0, 70)
 Logo.BackgroundTransparency = 1
-Logo.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: 0"
+Logo.Text = "MONVISUAL\n" .. Player.Name
 Logo.TextColor3 = getAccentColor()
 Logo.TextSize = 18
 Logo.Font = Enum.Font.GothamBold
 registerThemeElement(Logo, "text")
-
-RunService.Heartbeat:Connect(function()
-    local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-    Logo.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: " .. ping
-end)
 
 local categories = {"Визуал", "Косметика", "Шейдеры", "Темы"}
 local catButtons = {}
@@ -713,7 +710,7 @@ local function createCards(list)
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- ===== ФУНКЦИИ =====
+-- ФУНКЦИИ
 local fovFunc = {name = "FOV", desc = "Меняет поле зрения.", getState = function() return settings.fovEnabled end,
     settings = function() openSettings("FOV", {
         {name = "FOV", min = 30, max = 120, default = settings.fovValue, callback = function(v) settings.fovValue = v ApplyFOV() end}
@@ -802,7 +799,7 @@ local rtxAOFunc = {name = "RTX AO", desc = "Затенение окружени�
 local headlessFunc = {name = "Headless", desc = "Голова уходит вниз — её не видно.", getState = function() return settings.headlessEnabled end,
     callback = function(on) settings.headlessEnabled = on ApplyHeadless() end}
 
--- TARGET ESP LOOP
+-- LOOPS
 RunService.Heartbeat:Connect(function()
     if not settings.targetESPEnabled then
         for _, d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
@@ -874,7 +871,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- PARTICLES / BLUR / RIPPLE LOOPS
 RunService.Heartbeat:Connect(function()
     if not settings.particlesEnabled or not particleEmitter then return end
     local char = Player.Character
@@ -940,7 +936,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- THEMES
 local baseThemes = {
     {name = "Фиолетовая", hue = 270},
     {name = "Синяя", hue = 220},
@@ -1073,7 +1068,6 @@ local function showThemes()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- CATEGORIES
 catButtons[1].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Визуал"
     createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, blurFunc, fogFunc, skyShaderFunc, dayNightFunc})
@@ -1090,7 +1084,7 @@ catButtons[4].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- OPEN BUTTON
+-- КНОПКА ВХОДА
 local OpenBorder = Instance.new("Frame", ScreenGui)
 OpenBorder.Size = UDim2.new(0, 220, 0, 60)
 OpenBorder.Position = UDim2.new(0.5, -110, 0.001, -3)
@@ -1111,7 +1105,7 @@ OpenBtn.TextColor3 = getAccentColor()
 OpenBtn.TextSize = 13
 OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0
-OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: 0 | FPS: 0"
+OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | FPS: " .. fpsValue
 OpenBtn.TextWrapped = true
 OpenBtn.ZIndex = 2
 local oc = Instance.new("UICorner", OpenBtn)
@@ -1120,8 +1114,7 @@ registerThemeElement(OpenBtn, "bg")
 registerThemeElement(OpenBtn, "text")
 
 RunService.Heartbeat:Connect(function()
-    local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-    OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | Ping: " .. ping .. " | FPS: " .. fpsValue
+    OpenBtn.Text = "MONVISUAL\n" .. Player.Name .. " | FPS: " .. fpsValue
 end)
 
 OpenBtn.MouseButton1Click:Connect(function()
