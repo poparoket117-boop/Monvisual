@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v35)
+-- Monvisual GUI (Final v36)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -11,6 +11,7 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
+local Debris = game:GetService("Debris")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -45,6 +46,7 @@ local settings = {
     skyShaderEnabled = false, skyShaderID = 105721322908215,
     skyParticlesEnabled = false, skyParticlesDensity = 10,
     trailsEnabled = false, trailsTransparency = 0.5,
+    deathEffectEnabled = false,
     headlessEnabled = false,
     rtxShadowsEnabled = false, rtxShadowsIntensity = 0.7,
     rtxReflectionsEnabled = false,
@@ -85,6 +87,7 @@ local skyParticleFolder, trailFolder, trailCon
 local headlessConnection = nil
 local auraLight = nil
 local auraAttachment = nil
+local deathConnections = {}
 
 local fpsValue = 60
 local fpsCounter = 0
@@ -348,11 +351,185 @@ local function ApplyDayNight()
     end
 end
 
+-- ===== DEATH EFFECT =====
+local function playDeathEffect(character)
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local position = root.Position
+
+    -- Туман вокруг трупа
+    local fogPart = Instance.new("Part")
+    fogPart.Name = "DeathFog"
+    fogPart.Size = Vector3.new(1, 1, 1)
+    fogPart.Position = position - Vector3.new(0, 2, 0)
+    fogPart.Anchored = true
+    fogPart.CanCollide = false
+    fogPart.CanTouch = false
+    fogPart.CanQuery = false
+    fogPart.Transparency = 1
+    fogPart.Parent = workspace
+
+    local fogAttachment = Instance.new("Attachment")
+    fogAttachment.Parent = fogPart
+
+    local smoke = Instance.new("ParticleEmitter")
+    smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+    smoke.Rate = 0
+    smoke.Lifetime = NumberRange.new(1, 1.5)
+    smoke.Speed = NumberRange.new(0.2, 0.8)
+    smoke.SpreadAngle = Vector2.new(180, 180)
+    smoke.Rotation = NumberRange.new(0, 360)
+    smoke.RotSpeed = NumberRange.new(-25, 25)
+    smoke.Color = ColorSequence.new(getAccentColor())
+    smoke.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 2),
+        NumberSequenceKeypoint.new(0.3, 4),
+        NumberSequenceKeypoint.new(0.7, 5),
+        NumberSequenceKeypoint.new(1, 6)
+    })
+    smoke.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.2),
+        NumberSequenceKeypoint.new(0.5, 0.35),
+        NumberSequenceKeypoint.new(0.8, 0.65),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    smoke.Parent = fogAttachment
+    smoke:Emit(70)
+    Debris:AddItem(fogPart, 1.5)
+
+    -- Земля
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.FilterDescendantsInstances = {character}
+    local rayResult = workspace:Raycast(position + Vector3.new(0, 2, 0), Vector3.new(0, -20, 0), rayParams)
+    local groundY
+    if rayResult then groundY = rayResult.Position.Y else groundY = position.Y - 3 end
+
+    -- Столб
+    local diameter = 0.8
+    local finalHeight = 30
+    local pillar = Instance.new("Part")
+    pillar.Name = "DeathPillar"
+    pillar.Shape = Enum.PartType.Cylinder
+    pillar.Size = Vector3.new(0.1, diameter, diameter)
+    pillar.Anchored = true
+    pillar.CanCollide = false
+    pillar.CanTouch = false
+    pillar.CanQuery = false
+    pillar.Material = Enum.Material.Neon
+    pillar.Color = getAccentColor()
+    pillar.Transparency = 0.05
+    pillar.CFrame = CFrame.new(position.X, groundY + 0.05, position.Z) * CFrame.Angles(0, 0, math.rad(90))
+    pillar.Parent = workspace
+
+    -- Туман столба
+    local pillarFog = Instance.new("Part")
+    pillarFog.Name = "PillarFog"
+    pillarFog.Size = Vector3.new(1, 1, 1)
+    pillarFog.Position = Vector3.new(position.X, groundY, position.Z)
+    pillarFog.Anchored = true
+    pillarFog.CanCollide = false
+    pillarFog.CanTouch = false
+    pillarFog.CanQuery = false
+    pillarFog.Transparency = 1
+    pillarFog.Parent = workspace
+
+    local pillarAttachment = Instance.new("Attachment")
+    pillarAttachment.Parent = pillarFog
+
+    local pillarSmoke = Instance.new("ParticleEmitter")
+    pillarSmoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+    pillarSmoke.Rate = 8
+    pillarSmoke.Lifetime = NumberRange.new(0.7, 1.2)
+    pillarSmoke.Speed = NumberRange.new(0.5, 1.5)
+    pillarSmoke.SpreadAngle = Vector2.new(15, 15)
+    pillarSmoke.Rotation = NumberRange.new(0, 360)
+    pillarSmoke.RotSpeed = NumberRange.new(-15, 15)
+    pillarSmoke.Color = ColorSequence.new(getAccentColor())
+    pillarSmoke.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.6),
+        NumberSequenceKeypoint.new(0.5, 1),
+        NumberSequenceKeypoint.new(1, 1.5)
+    })
+    pillarSmoke.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.75),
+        NumberSequenceKeypoint.new(0.6, 0.85),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    pillarSmoke.Parent = pillarAttachment
+
+    -- Анимация
+    TweenService:Create(pillar, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = Vector3.new(finalHeight, diameter, diameter),
+        CFrame = CFrame.new(position.X, groundY + finalHeight / 2, position.Z) * CFrame.Angles(0, 0, math.rad(90)),
+        Transparency = 1
+    }):Play()
+
+    TweenService:Create(pillarFog, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = Vector3.new(4, finalHeight, 4),
+        Position = Vector3.new(position.X, groundY + finalHeight / 2, position.Z)
+    }):Play()
+
+    task.delay(1, function()
+        if not character or not character.Parent then return end
+        for _, object in ipairs(character:GetDescendants()) do
+            if object:IsA("BasePart") then
+                object.Transparency = 1
+                object.CanCollide = false
+            elseif object:IsA("Decal") or object:IsA("Texture") then
+                object.Transparency = 1
+            elseif object:IsA("ParticleEmitter") or object:IsA("Trail") or object:IsA("Beam") then
+                object.Enabled = false
+            end
+        end
+    end)
+
+    task.delay(3, function()
+        if pillar and pillar.Parent then pillar:Destroy() end
+        if pillarFog and pillarFog.Parent then pillarFog:Destroy() end
+        if character and character.Parent then character:Destroy() end
+    end)
+end
+
+local function ApplyDeathEffect()
+    -- Отключаем старые подключения
+    for _, c in ipairs(deathConnections) do
+        pcall(function() c:Disconnect() end)
+    end
+    deathConnections = {}
+
+    if not settings.deathEffectEnabled then return end
+
+    local function setupCharacter(character)
+        local humanoid = character:WaitForChild("Humanoid", 5)
+        if not humanoid then return end
+        local conn = humanoid.Died:Connect(function()
+            if settings.deathEffectEnabled then
+                playDeathEffect(character)
+            end
+        end)
+        table.insert(deathConnections, conn)
+    end
+
+    local function setupPlayer(player)
+        local c1 = player.CharacterAdded:Connect(setupCharacter)
+        table.insert(deathConnections, c1)
+        if player.Character then setupCharacter(player.Character) end
+    end
+
+    local c2 = Players.PlayerAdded:Connect(setupPlayer)
+    table.insert(deathConnections, c2)
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        setupPlayer(player)
+    end
+end
+
 task.spawn(function()
     if not Player.Character then Player.CharacterAdded:Wait() end
     task.wait(0.5)
     ApplyFOV() ApplyParticles() ApplyFog() ApplySky()
-    ApplySkyParticles() ApplyTrails() ApplyHeadless() ApplyRTX() ApplyGlow() ApplyAura() ApplyDayNight()
+    ApplySkyParticles() ApplyTrails() ApplyHeadless() ApplyRTX() ApplyGlow() ApplyAura() ApplyDayNight() ApplyDeathEffect()
 end)
 Player.CharacterAdded:Connect(function()
     task.wait(1)
@@ -812,6 +989,9 @@ local dayNightFunc = {name="Ночь / День", desc="Переключить �
     settings=function() openSettings("Ночь / День", {{name="Время", min=0, max=24, default=settings.dayNightTime, callback=function(v) settings.dayNightTime=v ApplyDayNight() end}}) end,
     callback=function(on) settings.dayNightEnabled=on ApplyDayNight() end}
 
+local deathEffectFunc = {name="Death Effect", desc="Туман и неоновый столб при смерти.", getState=function() return settings.deathEffectEnabled end,
+    callback=function(on) settings.deathEffectEnabled=on ApplyDeathEffect() end}
+
 local rtxShadowsFunc = {name="RTX Тени", desc="Реалистичные тени + атмосфера.", getState=function() return settings.rtxShadowsEnabled end,
     settings=function() openSettings("RTX Тени", {{name="Сила", min=0.1, max=1, default=settings.rtxShadowsIntensity, callback=function(v) settings.rtxShadowsIntensity=v ApplyRTX() end}}) end,
     callback=function(on) settings.rtxShadowsEnabled=on ApplyRTX() end}
@@ -1107,7 +1287,7 @@ end
 
 catButtons[1].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Визуал"
-    createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, fogFunc, skyShaderFunc, dayNightFunc})
+    createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, fogFunc, skyShaderFunc, dayNightFunc, deathEffectFunc})
 end)
 catButtons[2].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Косметика"
