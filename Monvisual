@@ -1,24 +1,28 @@
--- Monvisual Classic
-if _G.Monvisual_Loaded then pcall(function() _G.Monvisual_ScreenGui:Destroy() end) _G.Monvisual_Loaded = false end
+-- Monvisual Classic v1.1
+if _G.Monvisual_Loaded then
+    pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
+    _G.Monvisual_Loaded = false
+end
 _G.Monvisual_Loaded = true
 
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local Debris = game:GetService("Debris")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local WHITE = Color3.fromRGB(255,255,255)
-local BLACK = Color3.fromRGB(0,0,0)
 
 local themeHue = 270
-local themeIsClear = false
 local themeCustomColor = nil
+local themeIsClear = false
+local WHITE = Color3.fromRGB(255, 255, 255)
+local BLACK = Color3.fromRGB(0, 0, 0)
 
+local function getThemeColor() return Color3.fromRGB(20,20,30) end
 local function getAccentColor()
     if themeIsClear then return WHITE end
     if themeCustomColor then
@@ -26,25 +30,28 @@ local function getAccentColor()
     end
     return Color3.fromHSV(themeHue/360, 0.7, 0.9)
 end
-local function getThemeColor() return Color3.fromRGB(20,20,30) end
-local function getTransparency() if themeIsClear then return 0.7 end return 0.85 end
+local function getTransparency()
+    if themeIsClear then return 0.7 end
+    return 0.85
+end
 
 local settings = {
-    fovEnabled=false, fovValue=90,
-    particlesEnabled=false, particlesDensity=1,
-    targetESPEnabled=false,
-    landingCircleEnabled=false, rippleSize=0.1, rippleTransparency=0.5,
-    fogEnabled=false, fogStart=50, fogEnd=500,
-    skyShaderEnabled=false,
-    skyParticlesEnabled=false, skyParticlesDensity=10,
-    trailsEnabled=false, trailsTransparency=0.5,
-    deathEffectEnabled=false,
-    headlessEnabled=false,
-    rtxShadowsEnabled=false, rtxShadowsIntensity=0.7,
-    rtxReflectionsEnabled=false,
-    glowEnabled=false, glowIntensity=3,
-    auraEnabled=false, auraBrightness=5, auraRange=20,
-    dayNightEnabled=false, dayNightTime=12
+    stretchEnabled = false, STRETCH_FACTOR = 0.75,
+    fovEnabled = false, fovValue = 90,
+    particlesEnabled = false, particlesDensity = 1,
+    targetESPEnabled = false,
+    landingCircleEnabled = false, rippleSize = 0.1, rippleTransparency = 0.5,
+    fogEnabled = false, fogStart = 50, fogEnd = 500,
+    skyShaderEnabled = false,
+    skyParticlesEnabled = false, skyParticlesDensity = 10,
+    trailsEnabled = false, trailsTransparency = 0.5,
+    deathEffectEnabled = false,
+    headlessEnabled = false,
+    rtxShadowsEnabled = false, rtxShadowsIntensity = 0.7,
+    rtxReflectionsEnabled = false,
+    glowEnabled = false, glowIntensity = 3,
+    auraEnabled = false, auraBrightness = 5, auraRange = 20,
+    dayNightEnabled = false, dayNightTime = 12
 }
 
 local CONFIG_FILE = "Monvisual_config.json"
@@ -66,18 +73,48 @@ local function LoadConfig()
 end
 LoadConfig()
 
+-- === РАСТЯГ (безопасный, без накопления) ===
+local baseCameraCFrame = Camera.CFrame
+local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
+RunService.RenderStepped:Connect(function()
+    if not _G.Monvisual_Loaded then return end
+    if settings.stretchEnabled then
+        -- Берём оригинальный CFrame камеры в момент когда растяг выключен
+        -- Если только включили — фиксируем базу
+        if not _G.Monvisual_StretchBase then
+            _G.Monvisual_StretchBase = Camera.CFrame
+        end
+        Camera.CFrame = _G.Monvisual_StretchBase * stretchCFrame
+    else
+        _G.Monvisual_StretchBase = Camera.CFrame
+    end
+end)
+
 local particleAttachment, particleEmitter
 local espDiamonds, espAngle = {}, 0
+local espTargetCFrame = nil
 local skyParticleFolder, trailFolder, trailCon
 local headlessConnection, auraLight, auraAttachment
 local deathConnections = {}
+
+local fpsValue = 60
+local fpsCounter = 0
+local fpsTimer = tick()
+RunService.RenderStepped:Connect(function()
+    if not _G.Monvisual_Loaded then return end
+    fpsCounter = fpsCounter + 1
+    if tick() - fpsTimer >= 1 then
+        fpsValue = fpsCounter fpsCounter = 0 fpsTimer = tick()
+    end
+end)
 
 local function ApplyFOV() Camera.FieldOfView = settings.fovEnabled and settings.fovValue or 70 end
 local function ApplyParticles()
     if particleEmitter then pcall(function() particleEmitter:Destroy() end) particleEmitter=nil end
     if particleAttachment then pcall(function() particleAttachment:Destroy() end) particleAttachment=nil end
     if not settings.particlesEnabled then return end
-    local char = Player.Character or Player.CharacterAdded:Wait()
+    local char = Player.Character
+    if not char then char = Player.CharacterAdded:Wait() end
     local hrp = char:WaitForChild("HumanoidRootPart", 5)
     if not hrp then return end
     particleAttachment = Instance.new("Attachment", hrp)
@@ -106,9 +143,12 @@ local function ApplySky()
         if existing then existing:Destroy() end
         local sky = Instance.new("Sky")
         sky.Name = "MonvisualSky"
-        sky.SkyboxBk = "rbxassetid://105721322908215" sky.SkyboxDn = "rbxassetid://105721322908215"
-        sky.SkyboxFt = "rbxassetid://105721322908215" sky.SkyboxLf = "rbxassetid://105721322908215"
-        sky.SkyboxRt = "rbxassetid://105721322908215" sky.SkyboxUp = "rbxassetid://105721322908215"
+        sky.SkyboxBk = "rbxassetid://105721322908215"
+        sky.SkyboxDn = "rbxassetid://105721322908215"
+        sky.SkyboxFt = "rbxassetid://105721322908215"
+        sky.SkyboxLf = "rbxassetid://105721322908215"
+        sky.SkyboxRt = "rbxassetid://105721322908215"
+        sky.SkyboxUp = "rbxassetid://105721322908215"
         sky.Parent = Lighting
     else
         if existing then existing:Destroy() end
@@ -121,7 +161,7 @@ local function ApplySkyParticles()
     skyParticleFolder.Name = "MonvisualSkyParticles"
     skyParticleFolder.Parent = workspace
     task.spawn(function()
-        while settings.skyParticlesEnabled do
+        while settings.skyParticlesEnabled and _G.Monvisual_Loaded do
             local char = Player.Character
             if char then
                 local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -147,8 +187,10 @@ local function ApplyTrails()
     if trailFolder then trailFolder:Destroy() trailFolder=nil end
     if not settings.trailsEnabled then return end
     trailFolder = Instance.new("Folder")
-    trailFolder.Name = "MonvisualTrails" trailFolder.Parent = workspace
+    trailFolder.Name = "MonvisualTrails"
+    trailFolder.Parent = workspace
     trailCon = RunService.Heartbeat:Connect(function()
+        if not _G.Monvisual_Loaded then return end
         if not settings.trailsEnabled then return end
         local char = Player.Character
         if not char then return end
@@ -157,7 +199,8 @@ local function ApplyTrails()
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not hum or hum.MoveDirection.Magnitude < 0.1 then return end
         local trail = Instance.new("Part")
-        trail.Size = Vector3.new(0.5,3,0.5) trail.CFrame = hrp.CFrame
+        trail.Size = Vector3.new(0.5,3,0.5)
+        trail.CFrame = hrp.CFrame
         trail.Anchored = true trail.CanCollide = false trail.Material = Enum.Material.Neon
         trail.Color = getAccentColor() trail.Transparency = settings.trailsTransparency
         trail.Parent = trailFolder
@@ -188,6 +231,7 @@ local function ApplyHeadless()
     if settings.headlessEnabled then
         if Player.Character then hide(Player.Character) end
         headlessConnection = RunService.Stepped:Connect(function()
+            if not _G.Monvisual_Loaded then return end
             if not settings.headlessEnabled then return end
             local c = Player.Character
             if not c then return end
@@ -326,14 +370,18 @@ end
 task.spawn(function()
     if not Player.Character then Player.CharacterAdded:Wait() end
     task.wait(0.5)
+    if not _G.Monvisual_Loaded then return end
     ApplyFOV() ApplyParticles() ApplyFog() ApplySky() ApplySkyParticles()
     ApplyTrails() ApplyHeadless() ApplyRTX() ApplyGlow() ApplyAura() ApplyDayNight() ApplyDeathEffect()
 end)
 Player.CharacterAdded:Connect(function()
-    task.wait(1) ApplyParticles() ApplyHeadless() ApplyAura()
+    task.wait(1)
+    if not _G.Monvisual_Loaded then return end
+    ApplyParticles() ApplyHeadless() ApplyAura()
 end)
 
 RunService.Heartbeat:Connect(function()
+    if not _G.Monvisual_Loaded then return end
     if not settings.particlesEnabled then return end
     if not particleEmitter or not particleEmitter.Parent then ApplyParticles() if not particleEmitter then return end end
     local char = Player.Character
@@ -345,10 +393,12 @@ RunService.Heartbeat:Connect(function()
     particleEmitter.Rate = baseRate * settings.particlesDensity
 end)
 
+-- === TARGET ESP (плавный) ===
 RunService.Heartbeat:Connect(function()
+    if not _G.Monvisual_Loaded then return end
     if not settings.targetESPEnabled then
         for _,d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
-        espDiamonds = {} return
+        espDiamonds = {} espTargetCFrame = nil return
     end
     local char = Player.Character
     if not char then return end
@@ -371,59 +421,77 @@ RunService.Heartbeat:Connect(function()
                     local part = Instance.new("Part")
                     part.Size = Vector3.new(0.7,0.7,0.7) part.Anchored = true part.CanCollide = false
                     part.Material = Enum.Material.Neon part.Color = getAccentColor() part.Transparency = 0.2
-                    part.Parent = workspace table.insert(espDiamonds, part)
+                    part.CFrame = CFrame.new(0,0,0) * CFrame.Angles(math.rad(45), math.rad(45), 0)
+                    part.Parent = workspace
+                    table.insert(espDiamonds, part)
                 end
             end
             espAngle = espAngle + 0.05
             local center = tHRP.Position
+            local radius = 2.5
+            if not espTargetCFrame then
+                espTargetCFrame = CFrame.new(center)
+            else
+                local targetCF = CFrame.new(center)
+                local dist2 = (espTargetCFrame.Position - center).Magnitude
+                local alpha = dist2 > 20 and 0.03 or 0.15
+                espTargetCFrame = espTargetCFrame:Lerp(targetCF, alpha)
+            end
+            local smoothCenter = espTargetCFrame.Position
             for i,part in ipairs(espDiamonds) do
                 if part then
                     local angle = espAngle + (i-1)*(math.pi*2/8)
-                    local x = math.cos(angle)*2.5
-                    local z = math.sin(angle)*2.5
+                    local x = math.cos(angle)*radius
+                    local z = math.sin(angle)*radius
                     local y = math.sin(espAngle*2+i)*1.5
-                    part.CFrame = CFrame.new(center + Vector3.new(x,y,z)) * CFrame.Angles(math.rad(45), espAngle, math.rad(45))
+                    part.CFrame = CFrame.new(smoothCenter + Vector3.new(x,y,z)) * CFrame.Angles(math.rad(45), espAngle, math.rad(45))
                     part.Color = getAccentColor()
                 end
             end
         end
     else
         for _,d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
-        espDiamonds = {}
+        espDiamonds = {} espTargetCFrame = nil
     end
 end)
 
-local wasJumping = false
+-- === ВОЛНА ПРИ ПРЫЖКЕ (только при приземлении) ===
+local wasInAir = false
 RunService.Heartbeat:Connect(function()
-    if not settings.landingCircleEnabled then return end
+    if not _G.Monvisual_Loaded then return end
+    if not settings.landingCircleEnabled then wasInAir = false return end
     local char = Player.Character
-    if not char then return end
+    if not char then wasInAir = false return end
     local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
+    if not hum then wasInAir = false return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then wasInAir = false return end
     local state = hum:GetState()
-    local isJumping = state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall
-    if isJumping ~= wasJumping then
-        wasJumping = isJumping
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            for i=1,4 do
-                task.delay(i*0.04, function()
-                    local ring = Instance.new("Part")
-                    ring.Shape = Enum.PartType.Cylinder
-                    ring.Size = Vector3.new(0.1,1,1)
-                    ring.CFrame = CFrame.new(hrp.Position - Vector3.new(0,3,0)) * CFrame.Angles(0,0,math.rad(90))
-                    ring.Anchored = true ring.CanCollide = false ring.Material = Enum.Material.Neon
-                    ring.Color = getAccentColor() ring.Transparency = settings.rippleTransparency
-                    ring.Parent = workspace
-                    local t = TweenService:Create(ring, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                        Size = Vector3.new(0.1, (10+i*3)*settings.rippleSize, (10+i*3)*settings.rippleSize),
-                        Transparency = 1
-                    })
-                    t:Play() t.Completed:Connect(function() ring:Destroy() end)
-                end)
-            end
+    local inAir = state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.Flying
+    if wasInAir and not inAir then
+        local rp = RaycastParams.new()
+        rp.FilterType = Enum.RaycastFilterType.Exclude
+        rp.FilterDescendantsInstances = {char}
+        local ray = workspace:Raycast(hrp.Position + Vector3.new(0,2,0), Vector3.new(0,-15,0), rp)
+        local groundPos = ray and ray.Position or (hrp.Position - Vector3.new(0,3,0))
+        for i=1,4 do
+            task.delay(i*0.04, function()
+                local ring = Instance.new("Part")
+                ring.Shape = Enum.PartType.Cylinder
+                ring.Size = Vector3.new(0.1,1,1)
+                ring.CFrame = CFrame.new(groundPos) * CFrame.Angles(0,0,math.rad(90))
+                ring.Anchored = true ring.CanCollide = false ring.Material = Enum.Material.Neon
+                ring.Color = getAccentColor() ring.Transparency = settings.rippleTransparency
+                ring.Parent = workspace
+                local t = TweenService:Create(ring, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    Size = Vector3.new(0.1, (10+i*3)*settings.rippleSize, (10+i*3)*settings.rippleSize),
+                    Transparency = 1
+                })
+                t:Play() t.Completed:Connect(function() ring:Destroy() end)
+            end)
         end
     end
+    wasInAir = inAir
 end)
 
 -- ===== GUI =====
@@ -439,11 +507,9 @@ uiBlur.Name = "MonvisualUIBlur" uiBlur.Size = 0 uiBlur.Parent = Lighting
 local Main = Instance.new("Frame", ScreenGui)
 Main.Size = UDim2.new(0, 700, 0, 420)
 Main.Position = UDim2.new(0.5, -350, 0.5, -210)
-Main.BackgroundColor3 = getThemeColor()
-Main.BackgroundTransparency = getTransparency()
+Main.BackgroundColor3 = getThemeColor() Main.BackgroundTransparency = getTransparency()
 Main.BorderSizePixel = 0 Main.Visible = false
-local mainCorner = Instance.new("UICorner", Main)
-mainCorner.CornerRadius = UDim.new(0, 18)
+local mainCorner = Instance.new("UICorner", Main) mainCorner.CornerRadius = UDim.new(0, 18)
 
 local function toggleMenu(show)
     if show then
@@ -470,11 +536,9 @@ Stroke.Color = getAccentColor() Stroke.Thickness = 2
 
 local SideBar = Instance.new("Frame", Main)
 SideBar.Size = UDim2.new(0, 200, 1, 0)
-SideBar.BackgroundColor3 = getThemeColor()
-SideBar.BackgroundTransparency = getTransparency()
+SideBar.BackgroundColor3 = getThemeColor() SideBar.BackgroundTransparency = getTransparency()
 SideBar.BorderSizePixel = 0
-local sideCorner = Instance.new("UICorner", SideBar)
-sideCorner.CornerRadius = UDim.new(0, 18)
+local sideCorner = Instance.new("UICorner", SideBar) sideCorner.CornerRadius = UDim.new(0, 18)
 
 local Logo = Instance.new("TextLabel", SideBar)
 Logo.Size = UDim2.new(1, 0, 0, 70) Logo.BackgroundTransparency = 1
@@ -501,15 +565,12 @@ Content.Size = UDim2.new(1, -210, 1, -20) Content.Position = UDim2.new(0, 210, 0
 Content.BackgroundTransparency = 1
 
 local SectionTitle = Instance.new("TextLabel", Content)
-SectionTitle.Size = UDim2.new(1, -30, 0, 30)
-SectionTitle.BackgroundTransparency = 1
-SectionTitle.Text = "Визуал"
-SectionTitle.TextColor3 = WHITE SectionTitle.TextSize = 18
+SectionTitle.Size = UDim2.new(1, -30, 0, 30) SectionTitle.BackgroundTransparency = 1
+SectionTitle.Text = "Визуал" SectionTitle.TextColor3 = WHITE SectionTitle.TextSize = 18
 SectionTitle.Font = Enum.Font.GothamBold SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
 
 local CloseMenu = Instance.new("TextButton", Main)
-CloseMenu.Size = UDim2.new(0, 26, 0, 26)
-CloseMenu.Position = UDim2.new(1, -32, 0, 6)
+CloseMenu.Size = UDim2.new(0, 26, 0, 26) CloseMenu.Position = UDim2.new(1, -32, 0, 6)
 CloseMenu.BackgroundColor3 = Color3.fromRGB(180,50,50)
 CloseMenu.Text = "X" CloseMenu.TextColor3 = WHITE CloseMenu.TextSize = 14
 CloseMenu.Font = Enum.Font.GothamBold CloseMenu.BorderSizePixel = 0
@@ -517,8 +578,7 @@ local cmCorner = Instance.new("UICorner", CloseMenu) cmCorner.CornerRadius = UDi
 CloseMenu.MouseButton1Click:Connect(function() toggleMenu(false) end)
 
 local CardContainer = Instance.new("ScrollingFrame", Content)
-CardContainer.Size = UDim2.new(1, -15, 1, -50)
-CardContainer.Position = UDim2.new(0, 0, 0, 40)
+CardContainer.Size = UDim2.new(1, -15, 1, -50) CardContainer.Position = UDim2.new(0, 0, 0, 40)
 CardContainer.BackgroundTransparency = 1 CardContainer.BorderSizePixel = 0
 CardContainer.ScrollBarThickness = 4 CardContainer.ScrollBarImageColor3 = getAccentColor()
 CardContainer.ScrollBarImageTransparency = 0.5 CardContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -535,6 +595,7 @@ CardContainer.ChildAdded:Connect(function() task.wait() CardContainer.CanvasSize
 CardContainer.ChildRemoved:Connect(function() task.wait() CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10) end)
 
 local function updateTheme()
+    if not _G.Monvisual_Loaded then return end
     local accent = getAccentColor()
     local trans = getTransparency()
     Main.BackgroundColor3 = getThemeColor() Main.BackgroundTransparency = trans
@@ -576,8 +637,7 @@ local function openSettings(title, sliders)
     SF.Name = "Settings_" .. title
     SF.Size = UDim2.new(0, 320, 0, h)
     SF.Position = UDim2.new(0.5, -160, 0.5, -h/2)
-    SF.BackgroundColor3 = getThemeColor()
-    SF.BackgroundTransparency = getTransparency()
+    SF.BackgroundColor3 = getThemeColor() SF.BackgroundTransparency = getTransparency()
     SF.BorderSizePixel = 0 SF.Active = true
     local sfc = Instance.new("UICorner", SF) sfc.CornerRadius = UDim.new(0, 12)
     local t = Instance.new("TextLabel", SF)
@@ -596,7 +656,8 @@ local function openSettings(title, sliders)
         lbl.Position = UDim2.new(0.05, 0, 0, yB)
         lbl.BackgroundTransparency = 1
         lbl.Text = s.name .. ": " .. string.format("%.2f", s.default)
-        lbl.TextColor3 = WHITE lbl.TextSize = 12 lbl.Font = Enum.Font.Gotham        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextColor3 = WHITE lbl.TextSize = 12 lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
         local slider = Instance.new("TextButton", SF)
         slider.Size = UDim2.new(0.9, 0, 0, 16)
         slider.Position = UDim2.new(0.05, 0, 0, yB + 22)
@@ -645,13 +706,10 @@ local function openSettings(title, sliders)
 end
 
 local function createCards(list)
-    for _,child in ipairs(CardContainer:GetChildren()) do
-        if child:IsA("Frame") then child:Destroy() end
-    end
+    for _,child in ipairs(CardContainer:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
     for i,f in ipairs(list) do
         local card = Instance.new("Frame", CardContainer)
-        card.BackgroundColor3 = getThemeColor()
-        card.BackgroundTransparency = getTransparency()
+        card.BackgroundColor3 = getThemeColor() card.BackgroundTransparency = getTransparency()
         card.BorderSizePixel = 0
         local cc = Instance.new("UICorner", card) cc.CornerRadius = UDim.new(0, 10)
         local stroke = Instance.new("UIStroke", card)
@@ -674,31 +732,35 @@ local function createCards(list)
             local setCorner = Instance.new("UICorner", setBtn) setCorner.CornerRadius = UDim.new(0, 5)
             setBtn.MouseButton1Click:Connect(function() f.settings() end)
         end
-        if not f.noToggle then
-            local toggle = Instance.new("TextButton", card)
-            toggle.Size = UDim2.new(0, 22, 0, 12) toggle.Position = UDim2.new(1, -26, 0, 6)
-            toggle.BackgroundColor3 = WHITE toggle.Text = "OFF"
-            toggle.TextColor3 = BLACK toggle.TextSize = 8 toggle.Font = Enum.Font.GothamBold
-            toggle.BorderSizePixel = 0 toggle.AutoButtonColor = false
-            local tc = Instance.new("UICorner", toggle) tc.CornerRadius = UDim.new(1, 0)
-            if f.getState and f.getState() then
-                toggle.BackgroundColor3 = BLACK toggle.Text = "ON" toggle.TextColor3 = WHITE
-            end
-            toggle.MouseButton1Click:Connect(function()
-                if f.getState then
-                    local ns = not f.getState()
-                    f.callback(ns)
-                    if ns then toggle.BackgroundColor3 = BLACK toggle.Text = "ON" toggle.TextColor3 = WHITE
-                    else toggle.BackgroundColor3 = WHITE toggle.Text = "OFF" toggle.TextColor3 = BLACK end
-                    SaveConfig()
-                end
-            end)
+        local toggle = Instance.new("TextButton", card)
+        toggle.Size = UDim2.new(0, 22, 0, 12) toggle.Position = UDim2.new(1, -26, 0, 6)
+        toggle.BackgroundColor3 = WHITE toggle.Text = "OFF"
+        toggle.TextColor3 = BLACK toggle.TextSize = 8 toggle.Font = Enum.Font.GothamBold
+        toggle.BorderSizePixel = 0 toggle.AutoButtonColor = false
+        local tc = Instance.new("UICorner", toggle) tc.CornerRadius = UDim.new(1, 0)
+        if f.getState and f.getState() then
+            toggle.BackgroundColor3 = BLACK toggle.Text = "ON" toggle.TextColor3 = WHITE
         end
+        toggle.MouseButton1Click:Connect(function()
+            if f.getState then
+                local ns = not f.getState()
+                f.callback(ns)
+                if ns then toggle.BackgroundColor3 = BLACK toggle.Text = "ON" toggle.TextColor3 = WHITE
+                else toggle.BackgroundColor3 = WHITE toggle.Text = "OFF" toggle.TextColor3 = BLACK end
+                SaveConfig()
+            end
+        end)
     end
     task.wait()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
+local stretchFunc = {name="Растяг 4:3", desc="Растягивает экран.", getState=function() return settings.stretchEnabled end,
+    settings=function() openSettings("Растяг", {{name="Фактор", min=50, max=100, default=settings.STRETCH_FACTOR*100, callback=function(v)
+        settings.STRETCH_FACTOR=v/100
+        stretchCFrame=CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
+        _G.Monvisual_StretchBase = nil end}}) end,
+    callback=function(on) settings.stretchEnabled=on _G.Monvisual_StretchBase = nil end}
 local fovFunc = {name="FOV", desc="Меняет поле зрения.", getState=function() return settings.fovEnabled end,
     settings=function() openSettings("FOV", {{name="FOV", min=30, max=120, default=settings.fovValue, callback=function(v) settings.fovValue=v ApplyFOV() end}}) end,
     callback=function(on) settings.fovEnabled=on ApplyFOV() end}
@@ -706,7 +768,9 @@ local particlesFunc = {name="Партиклы", desc="Частицы при хо
     settings=function() openSettings("Партиклы", {{name="Плотность", min=0.5, max=50, default=settings.particlesDensity, callback=function(v) settings.particlesDensity=v end}}) end,
     callback=function(on) settings.particlesEnabled=on ApplyParticles() end}
 local skyParticlesFunc = {name="Ворлд партиклы", desc="Ромбики вокруг игрока.", getState=function() return settings.skyParticlesEnabled end,
-    settings=function() openSettings("Ворлд партиклы", {{name="Плотность", min=0.5, max=50, default=settings.skyParticlesDensity, callback=function(v) settings.skyParticlesDensity=v if settings.skyParticlesEnabled then ApplySkyParticles() end end}}) end,
+    settings=function() openSettings("Ворлд партиклы", {{name="Плотность", min=0.5, max=50, default=settings.skyParticlesDensity, callback=function(v)
+        settings.skyParticlesDensity=v
+        if settings.skyParticlesEnabled then ApplySkyParticles() end end}}) end,
     callback=function(on) settings.skyParticlesEnabled=on ApplySkyParticles() end}
 local trailsFunc = {name="Movement Trails", desc="Шлейф за игроком.", getState=function() return settings.trailsEnabled end,
     settings=function() openSettings("Trails", {{name="Прозрачность", min=0.1, max=1, default=settings.trailsTransparency, callback=function(v) settings.trailsTransparency=v end}}) end,
@@ -716,11 +780,14 @@ local targetFunc = {name="Target ESP", desc="Ромбики на ближайш�
         settings.targetESPEnabled=on
         if not on then
             for _,d in ipairs(espDiamonds) do if d and d.Parent then d:Destroy() end end
-            espDiamonds = {}
+            espDiamonds = {} espTargetCFrame = nil
         end
     end}
 local circleFunc = {name="Волна при прыжке", desc="Эффект капли при прыжке.", getState=function() return settings.landingCircleEnabled end,
-    settings=function() openSettings("Волна при прыжке", {{name="Размер", min=0.10, max=5, default=settings.rippleSize, callback=function(v) settings.rippleSize=v end},{name="Прозрачность", min=0, max=1, default=settings.rippleTransparency, callback=function(v) settings.rippleTransparency=v end}}) end,
+    settings=function() openSettings("Волна при прыжке", {
+        {name="Размер", min=0.10, max=5, default=settings.rippleSize, callback=function(v) settings.rippleSize=v end},
+        {name="Прозрачность", min=0, max=1, default=settings.rippleTransparency, callback=function(v) settings.rippleTransparency=v end}
+    }) end,
     callback=function(on) settings.landingCircleEnabled=on end}
 local fogFunc = {name="Туман", desc="Туман под цвет темы.", getState=function() return settings.fogEnabled end,
     settings=function() openSettings("Туман", {{name="Дальность", min=50, max=1000, default=settings.fogEnd, callback=function(v) settings.fogEnd=v ApplyFog() end}}) end,
@@ -741,21 +808,18 @@ local glowFunc = {name="Свечение", desc="Неоновое свечени
     settings=function() openSettings("Свечение", {{name="Сила", min=0, max=10, default=settings.glowIntensity, callback=function(v) settings.glowIntensity=v ApplyGlow() end}}) end,
     callback=function(on) settings.glowEnabled=on ApplyGlow() end}
 local auraFunc = {name="Свечение вокруг меня", desc="Светящаяся аура.", getState=function() return settings.auraEnabled end,
-    settings=function() openSettings("Свечение вокруг меня", {{name="Яркость", min=0, max=20, default=settings.auraBrightness, callback=function(v) settings.auraBrightness=v ApplyAura() end},{name="Радиус", min=1, max=60, default=settings.auraRange, callback=function(v) settings.auraRange=v ApplyAura() end}}) end,
+    settings=function() openSettings("Свечение вокруг меня", {
+        {name="Яркость", min=0, max=20, default=settings.auraBrightness, callback=function(v) settings.auraBrightness=v ApplyAura() end},
+        {name="Радиус", min=1, max=60, default=settings.auraRange, callback=function(v) settings.auraRange=v ApplyAura() end}
+    }) end,
     callback=function(on) settings.auraEnabled=on ApplyAura() end}
 local headlessFunc = {name="Headless", desc="Голова уходит вниз.", getState=function() return settings.headlessEnabled end,
     callback=function(on) settings.headlessEnabled=on ApplyHeadless() end}
 
--- Тема-функции
 local themeList = {
-    {name="Фиолетовая", hue=270},
-    {name="Синяя", hue=220},
-    {name="Красная", hue=0},
-    {name="Зелёная", hue=120},
-    {name="Розовая", hue=320},
-    {name="Голубая", hue=190},
-    {name="Жёлтая", hue=50},
-    {name="Прозрачная", clear=true}
+    {name="Фиолетовая", hue=270},{name="Синяя", hue=220},{name="Красная", hue=0},
+    {name="Зелёная", hue=120},{name="Розовая", hue=320},{name="Голубая", hue=190},
+    {name="Жёлтая", hue=50},{name="Прозрачная", clear=true}
 }
 
 local function showThemes()
@@ -774,8 +838,8 @@ local function showThemes()
         title.BackgroundTransparency = 1 title.Text = t.name
         title.TextColor3 = WHITE title.TextSize = 14 title.Font = Enum.Font.GothamBold
         local btn = Instance.new("TextButton", card)
-        btn.Size = UDim2.new(1, 0, 1, 0) btn.BackgroundTransparency = 1
-        btn.Text = "" btn.Parent = card
+        btn.Size = UDim2.new(1, 0, 1, 0) btn.BackgroundTransparency = 1 btn.Text = ""
+        btn.Parent = card
         btn.MouseButton1Click:Connect(function()
             if t.clear then themeIsClear = true themeCustomColor = nil
             else themeIsClear = false themeCustomColor = nil themeHue = t.hue end
@@ -786,7 +850,6 @@ local function showThemes()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- Меню-переключение на остров
 local function showMenuSwitch()
     SectionTitle.Text = "Меню"
     for _,ch in ipairs(CardContainer:GetChildren()) do if ch:IsA("Frame") then ch:Destroy() end end
@@ -808,7 +871,6 @@ local function showMenuSwitch()
     btn.BorderSizePixel = 0 btn.Parent = card
     local bc = Instance.new("UICorner", btn) bc.CornerRadius = UDim.new(0, 8)
     btn.MouseButton1Click:Connect(function()
-        -- Уничтожаем всё классическое
         if _G.Monvisual_ScreenGui then _G.Monvisual_ScreenGui:Destroy() _G.Monvisual_ScreenGui = nil end
         for _,obj in ipairs(Lighting:GetChildren()) do
             if obj.Name == "MonvisualUIBlur" or obj.Name == "MonvisualBlur" or obj.Name == "MonvisualBloom"
@@ -820,6 +882,7 @@ local function showMenuSwitch()
             if obj.Name == "MonvisualSkyParticles" or obj.Name == "MonvisualTrails" then obj:Destroy() end
         end
         _G.Monvisual_Loaded = false
+        _G.Monvisual_StretchBase = nil
         task.wait(0.2)
         loadstring(game:HttpGet("https://raw.githubusercontent.com/poparoket117-boop/Monvisual2/refs/heads/main/Monvisual2"))()
     end)
@@ -830,7 +893,7 @@ end
 catButtons[1].MouseButton1Click:Connect(function()
     for _,b in ipairs(catButtons) do b.BackgroundColor3 = getThemeColor() end
     catButtons[1].BackgroundColor3 = Color3.fromRGB(60,60,80)
-    createCards({fovFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, fogFunc, skyShaderFunc, dayNightFunc, deathFunc})
+    createCards({stretchFunc, fovFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, fogFunc, skyShaderFunc, dayNightFunc, deathFunc})
 end)
 catButtons[2].MouseButton1Click:Connect(function()
     for _,b in ipairs(catButtons) do b.BackgroundColor3 = getThemeColor() end
@@ -854,14 +917,12 @@ catButtons[5].MouseButton1Click:Connect(function()
 end)
 
 local OpenBorder = Instance.new("Frame", ScreenGui)
-OpenBorder.Size = UDim2.new(0, 160, 0, 44)
-OpenBorder.Position = UDim2.new(0.5, -80, 0.001, -3)
+OpenBorder.Size = UDim2.new(0, 160, 0, 44) OpenBorder.Position = UDim2.new(0.5, -80, 0.001, -3)
 OpenBorder.BackgroundColor3 = WHITE OpenBorder.BackgroundTransparency = 1
 OpenBorder.BorderSizePixel = 0 OpenBorder.ZIndex = 1
 local obCorner = Instance.new("UICorner", OpenBorder) obCorner.CornerRadius = UDim.new(0, 12)
 local OpenBtn = Instance.new("TextButton", ScreenGui)
-OpenBtn.Size = UDim2.new(0, 156, 0, 40)
-OpenBtn.Position = UDim2.new(0.5, -78, 0.001, 0)
+OpenBtn.Size = UDim2.new(0, 156, 0, 40) OpenBtn.Position = UDim2.new(0.5, -78, 0.001, 0)
 OpenBtn.BackgroundColor3 = getThemeColor() OpenBtn.BackgroundTransparency = 1
 OpenBtn.TextColor3 = WHITE OpenBtn.TextSize = 12 OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0 OpenBtn.Text = "MONVISUAL\nFPS: " .. fpsValue
@@ -869,7 +930,10 @@ OpenBtn.TextWrapped = true OpenBtn.ZIndex = 2
 local oc = Instance.new("UICorner", OpenBtn) oc.CornerRadius = UDim.new(0, 10)
 local OpenStroke = Instance.new("UIStroke", OpenBorder)
 OpenStroke.Color = WHITE OpenStroke.Thickness = 0.5
-RunService.Heartbeat:Connect(function() OpenBtn.Text = "MONVISUAL\nFPS: " .. fpsValue end)
+RunService.Heartbeat:Connect(function()
+    if not _G.Monvisual_Loaded then return end
+    OpenBtn.Text = "MONVISUAL\nFPS: " .. fpsValue
+end)
 OpenBtn.MouseButton1Click:Connect(function() toggleMenu(not Main.Visible) end)
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
@@ -877,4 +941,4 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 updateTheme()
 catButtons[1].MouseButton1Click:Fire()
-print("[monvisual] Classic loaded!")
+print("[monvisual] Classic v1.1 loaded!")
