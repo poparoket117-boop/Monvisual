@@ -16,10 +16,28 @@ local SoundService = game:GetService("SoundService")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Родное время респавна (чтобы скрипт не влиял на респавн)
-pcall(function()
-    Players.RespawnTime = 8
-    Players.CharacterAutoLoads = true
+-- ===== РЕСПАВН ЧЕРЕЗ 6 СЕКУНД (форсированный) =====
+task.spawn(function()
+    task.wait(1)
+    if Players.CharacterAutoLoads then
+        pcall(function() Players.RespawnTime = 6 end)
+    else
+        local function setupRespawn(character)
+            local humanoid = character:WaitForChild("Humanoid", 5)
+            if not humanoid then return end
+            humanoid.Died:Connect(function()
+                task.wait(6)
+                if Player.Character == character and character.Parent then
+                    local hum = character:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.Health <= 0 then
+                        pcall(function() Player:LoadCharacter() end)
+                    end
+                end
+            end)
+        end
+        if Player.Character then setupRespawn(Player.Character) end
+        Player.CharacterAdded:Connect(setupRespawn)
+    end
 end)
 
 local themeHue = 270
@@ -1439,8 +1457,7 @@ local function showThemes()
             else
                 themeIsClear = false
                 themeHue = t.hue
-            end
-            updateTheme()
+            end            updateTheme()
             SaveConfig()
         end)
     end
