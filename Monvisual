@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v39)
+-- Monvisual GUI (Final v40)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -110,7 +110,9 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-local function ApplyFOV() Camera.FieldOfView = settings.fovEnabled and settings.fovValue or 70 end
+local function ApplyFOV()
+    Camera.FieldOfView = settings.fovEnabled and settings.fovValue or 70
+end
 local function ApplyParticles()
     if particleEmitter then pcall(function() particleEmitter:Destroy() end) particleEmitter = nil end
     if particleAttachment then pcall(function() particleAttachment:Destroy() end) particleAttachment = nil end
@@ -419,7 +421,7 @@ local function ApplyDayNight()
     end
 end
 
--- ===== DEATH EFFECT =====
+-- ===== DEATH EFFECT (только для других игроков) =====
 local function playDeathEffect(character)
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
@@ -550,7 +552,7 @@ local function playDeathEffect(character)
     task.delay(1.5, function()
         if pillar and pillar.Parent then pillar:Destroy() end
         if pillarFog and pillarFog.Parent then pillarFog:Destroy() end
-        if character and character.Parent then character:Destroy() end
+        -- ВАЖНО: не удаляем персонаж, чтобы Roblox сам его респавнил родным способом
     end)
 end
 
@@ -560,7 +562,10 @@ local function ApplyDeathEffect()
     end
     deathConnections = {}
     if not settings.deathEffectEnabled then return end
-    local function setupCharacter(character)
+    
+    local function setupCharacter(character, playerObj)
+        -- ТОЛЬКО для других игроков, не для себя
+        if playerObj == Player then return end
         local humanoid = character:WaitForChild("Humanoid", 5)
         if not humanoid then return end
         local conn = humanoid.Died:Connect(function()
@@ -571,9 +576,13 @@ local function ApplyDeathEffect()
         table.insert(deathConnections, conn)
     end
     local function setupPlayer(player)
-        local c1 = player.CharacterAdded:Connect(setupCharacter)
+        -- Пропускаем локального игрока
+        if player == Player then return end
+        local c1 = player.CharacterAdded:Connect(function(char)
+            setupCharacter(char, player)
+        end)
         table.insert(deathConnections, c1)
-        if player.Character then setupCharacter(player.Character) end
+        if player.Character then setupCharacter(player.Character, player) end
     end
     local c2 = Players.PlayerAdded:Connect(setupPlayer)
     table.insert(deathConnections, c2)
@@ -582,7 +591,7 @@ local function ApplyDeathEffect()
     end
 end
 
--- ===== GTA WASTED =====
+-- ===== GTA WASTED (только для себя) =====
 local function resetWastedEffect()
     if not wastedGui then return end
     if wastedLabel then
@@ -740,7 +749,8 @@ local function ApplyWasted()
     wastedSound.PlaybackSpeed = 1
     wastedSound.Parent = SoundService
 
-    local function setupChar(char)
+    -- ТОЛЬКО на смерть ЛОКАЛЬНОГО игрока
+    local function setupLocalChar(char)
         local hum = char:WaitForChild("Humanoid", 5)
         if not hum then return end
         hum.Died:Connect(function()
@@ -749,10 +759,10 @@ local function ApplyWasted()
             end
         end)
     end
-    if Player.Character then setupChar(Player.Character) end
+    if Player.Character then setupLocalChar(Player.Character) end
     Player.CharacterAdded:Connect(function(char)
         task.wait(1)
-        if settings.wastedEnabled then setupChar(char) end
+        if settings.wastedEnabled then setupLocalChar(char) end
     end)
 end
 
@@ -1219,10 +1229,10 @@ local dayNightFunc = {name="Ночь / День", desc="Переключить �
     settings=function() openSettings("Ночь / День", {{name="Время", min=0, max=24, default=settings.dayNightTime, callback=function(v) settings.dayNightTime=v ApplyDayNight() end}}) end,
     callback=function(on) settings.dayNightEnabled=on ApplyDayNight() end}
 
-local deathEffectFunc = {name="Death Effect", desc="Туман и неоновый столб при смерти.", getState=function() return settings.deathEffectEnabled end,
+local deathEffectFunc = {name="Death Effect", desc="Туман и столб при смерти других игроков.", getState=function() return settings.deathEffectEnabled end,
     callback=function(on) settings.deathEffectEnabled=on ApplyDeathEffect() end}
 
-local wastedFunc = {name="GTA Wasted", desc="Ч/б экран, WASTED и подъём камеры при смерти.", getState=function() return settings.wastedEnabled end,
+local wastedFunc = {name="GTA Wasted", desc="Ч/б экран и WASTED при твоей смерти.", getState=function() return settings.wastedEnabled end,
     callback=function(on) settings.wastedEnabled=on ApplyWasted() end}
 
 local rtxShadowsFunc = {name="RTX Тени", desc="Реалистичные тени + атмосфера.", getState=function() return settings.rtxShadowsEnabled end,
@@ -1232,7 +1242,7 @@ local rtxShadowsFunc = {name="RTX Тени", desc="Реалистичные те
 local rtxReflectionsFunc = {name="RTX Отражения", desc="Реалистичные отражения.", getState=function() return settings.rtxReflectionsEnabled end,
     callback=function(on) settings.rtxReflectionsEnabled=on ApplyRTX() end}
 
-local glowFunc = {name="Свечение", desc="Неоновое свечение вокруг ярких объектов.", getState=function() return settings.glowEnabled end,
+local glowFunc = {name="Свечение", desc="Неоновое свечение.", getState=function() return settings.glowEnabled end,
     settings=function() openSettings("Свечение", {
         {name="Сила", min=0, max=10, default=settings.glowIntensity, callback=function(v)
             settings.glowIntensity=v
@@ -1241,7 +1251,7 @@ local glowFunc = {name="Свечение", desc="Неоновое свечени
     }) end,
     callback=function(on) settings.glowEnabled=on ApplyGlow() end}
 
-local auraFunc = {name="Свечение вокруг меня", desc="Светящаяся аура вокруг персонажа.", getState=function() return settings.auraEnabled end,
+local auraFunc = {name="Свечение вокруг меня", desc="Светящаяся аура.", getState=function() return settings.auraEnabled end,
     settings=function() openSettings("Свечение вокруг меня", {
         {name="Яркость", min=0, max=20, default=settings.auraBrightness, callback=function(v)
             settings.auraBrightness=v
@@ -1440,150 +1450,3 @@ local function showThemes()
     local hueCard = Instance.new("Frame", CardContainer)
     hueCard.Size = UDim2.new(0.96, 0, 0, 100)
     hueCard.BackgroundColor3 = getThemeColor()
-    hueCard.BackgroundTransparency = 0.85
-    hueCard.BorderSizePixel = 0
-    local hcCorner = Instance.new("UICorner", hueCard)
-    hcCorner.CornerRadius = UDim.new(0, 10)
-    local hcStroke = Instance.new("UIStroke", hueCard)
-    hcStroke.Color = getAccentColor()
-    hcStroke.Thickness = 2
-
-    local hueLabel = Instance.new("TextLabel", hueCard)
-    hueLabel.Size = UDim2.new(1, 0, 0, 20)
-    hueLabel.Position = UDim2.new(0, 0, 0.05, 0)
-    hueLabel.BackgroundTransparency = 1
-    hueLabel.Text = "Свой оттенок: " .. themeHue
-    hueLabel.TextColor3 = WHITE
-    hueLabel.TextSize = 14
-    hueLabel.Font = Enum.Font.GothamBold
-
-    local slider = Instance.new("TextButton", hueCard)
-    slider.Size = UDim2.new(0.9, 0, 0, 20)
-    slider.Position = UDim2.new(0.05, 0, 0.4, 0)
-    slider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    slider.Text = ""
-    slider.BorderSizePixel = 0
-    slider.AutoButtonColor = false
-    local sCorner = Instance.new("UICorner", slider)
-    sCorner.CornerRadius = UDim.new(1, 0)
-
-    local gradient = Instance.new("UIGradient", slider)
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
-        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
-        ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
-        ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
-    })
-
-    local knob = Instance.new("Frame", slider)
-    knob.Size = UDim2.new(0, 18, 0, 18)
-    knob.Position = UDim2.new(themeHue / 360, -9, 0.5, -9)
-    knob.BackgroundColor3 = WHITE
-    knob.BorderSizePixel = 0
-    local kCorner = Instance.new("UICorner", knob)
-    kCorner.CornerRadius = UDim.new(1, 0)
-
-    local dragging = false
-    local function updateFromInput(input)
-        local x = input.Position.X
-        local absX = slider.AbsolutePosition.X
-        local sizeX = slider.AbsoluteSize.X
-        if sizeX > 0 then
-            local pos = math.clamp((x - absX) / sizeX, 0, 1)
-            themeHue = math.floor(pos * 360)
-            themeCustomColor = nil
-            themeIsClear = false
-            hueLabel.Text = "Свой оттенок: " .. themeHue
-            knob.Position = UDim2.new(pos, -9, 0.5, -9)
-            updateTheme()
-            SaveConfig()
-        end
-    end
-    slider.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true updateFromInput(input)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-            updateFromInput(input)
-        end
-    end)
-    task.wait()
-    CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
-end
-
-catButtons[1].MouseButton1Click:Connect(function()
-    SectionTitle.Text = "Визуал"
-    createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, fogFunc, skyShaderFunc, dayNightFunc, deathEffectFunc, wastedFunc})
-end)
-catButtons[2].MouseButton1Click:Connect(function()
-    SectionTitle.Text = "Косметика"
-    createCards({headlessFunc, hatFunc})
-end)
-catButtons[3].MouseButton1Click:Connect(function()
-    SectionTitle.Text = "Шейдеры"
-    createCards({rtxShadowsFunc, rtxReflectionsFunc, glowFunc, auraFunc})
-end)
-catButtons[4].MouseButton1Click:Connect(function()
-    showThemes()
-end)
-
--- КНОПКА ВХОДА
-local OpenBorder = Instance.new("Frame", ScreenGui)
-OpenBorder.Size = UDim2.new(0, 160, 0, 44)
-OpenBorder.Position = UDim2.new(0.5, -80, 0.001, -3)
-OpenBorder.BackgroundColor3 = WHITE
-OpenBorder.BackgroundTransparency = 1
-OpenBorder.BorderSizePixel = 0
-OpenBorder.ZIndex = 1
-local obCorner = Instance.new("UICorner", OpenBorder)
-obCorner.CornerRadius = UDim.new(0, 12)
-
-local OpenBtn = Instance.new("TextButton", ScreenGui)
-OpenBtn.Size = UDim2.new(0, 156, 0, 40)
-OpenBtn.Position = UDim2.new(0.5, -78, 0.001, 0)
-OpenBtn.BackgroundColor3 = getThemeColor()
-OpenBtn.BackgroundTransparency = 1
-OpenBtn.TextColor3 = WHITE
-OpenBtn.TextSize = 12
-OpenBtn.Font = Enum.Font.GothamBold
-OpenBtn.BorderSizePixel = 0
-OpenBtn.Text = "MONVISUAL\nFPS: " .. fpsValue
-OpenBtn.TextWrapped = true
-OpenBtn.ZIndex = 2
-local oc = Instance.new("UICorner", OpenBtn)
-oc.CornerRadius = UDim.new(0, 10)
-
-local OpenStroke = Instance.new("UIStroke", OpenBorder)
-OpenStroke.Color = WHITE
-OpenStroke.Thickness = 0.5
-
-RunService.Heartbeat:Connect(function()
-    OpenBtn.Text = "MONVISUAL\nFPS: " .. fpsValue
-end)
-
-OpenBtn.MouseButton1Click:Connect(function()
-    toggleMenu(not Main.Visible)
-end)
-
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        toggleMenu(not Main.Visible)
-    end
-end)
-
-updateTheme()
-
-catButtons[1].MouseButton1Click:Fire()
-
-print("Monvisual loaded!")
