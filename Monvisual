@@ -1351,3 +1351,41 @@ updateTheme()
 catButtons[1].MouseButton1Click:Fire()
 
 print("Monvisual loaded!")
+-- ===== Кнопка переключения на Меню №2 (Остров) =====
+local switchBtn = Instance.new("TextButton")
+switchBtn.Size = UDim2.new(0, 140, 0, 34)
+switchBtn.Position = UDim2.new(1, -150, 0, 8)
+switchBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+switchBtn.BackgroundTransparency = 0.55
+switchBtn.Text = "→ Меню №2"
+switchBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+switchBtn.TextSize = 14
+switchBtn.Font = Enum.Font.GothamMedium
+switchBtn.BorderSizePixel = 0
+switchBtn.Parent = ScreenGui
+Instance.new("UICorner", switchBtn).CornerRadius = UDim.new(1, 0)
+local sws = Instance.new("UIStroke", switchBtn)
+sws.Color = Color3.fromRGB(255, 255, 255)
+sws.Thickness = 0.8
+sws.Transparency = 0.3
+switchBtn.MouseButton1Click:Connect(function()
+    -- Удаляем всё от классики
+    if _G.Monvisual_ScreenGui then _G.Monvisual_ScreenGui:Destroy() _G.Monvisual_ScreenGui = nil end
+    for _, obj in ipairs(Lighting:GetChildren()) do
+        if obj.Name == "MonvisualUIBlur" then obj:Destroy() end
+        if obj.Name == "MonvisualBlur" then obj:Destroy() end
+        if obj.Name == "MonvisualBloom" then obj:Destroy() end
+        if obj.Name == "MonvisualSky" then obj:Destroy() end
+        if obj.Name == "MonvisualAtmo" then obj:Destroy() end
+        if obj.Name == "MonvisualSun" then obj:Destroy() end
+    end
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj.Name == "MonvisualSkyParticles" or obj.Name == "MonvisualTrails" then
+            obj:Destroy()
+        end
+    end
+    _G.Monvisual_Loaded = false
+    task.wait(0.2)
+    -- Грузим остров
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/poparoket117-boop/Monvisual2/refs/heads/main/Monvisual2"))()
+end)
