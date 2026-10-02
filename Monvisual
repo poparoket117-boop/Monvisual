@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v38)
+-- Monvisual GUI (Final v39)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -12,6 +12,7 @@ local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
 local Debris = game:GetService("Debris")
+local SoundService = game:GetService("SoundService")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -45,6 +46,7 @@ local settings = {
     skyParticlesEnabled = false, skyParticlesDensity = 10,
     trailsEnabled = false, trailsTransparency = 0.5,
     deathEffectEnabled = false,
+    wastedEnabled = false,
     headlessEnabled = false,
     hatEnabled = false,
     rtxShadowsEnabled = false, rtxShadowsIntensity = 0.7,
@@ -90,6 +92,12 @@ local deathConnections = {}
 local hatModel = nil
 local hatConnection = nil
 
+-- WASTED переменные
+local wastedGui, wastedLabel, wastedBandFrame, wastedBlackFrame
+local wastedColorCorrection, wastedBlur, wastedSound
+local wastedConnection = nil
+local wastedEffectRunning = false
+
 local fpsValue = 60
 local fpsCounter = 0
 local fpsTimer = tick()
@@ -102,9 +110,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-local function ApplyFOV()
-    Camera.FieldOfView = settings.fovEnabled and settings.fovValue or 70
-end
+local function ApplyFOV() Camera.FieldOfView = settings.fovEnabled and settings.fovValue or 70 end
 local function ApplyParticles()
     if particleEmitter then pcall(function() particleEmitter:Destroy() end) particleEmitter = nil end
     if particleAttachment then pcall(function() particleAttachment:Destroy() end) particleAttachment = nil end
@@ -259,12 +265,10 @@ local function ApplyHeadless()
     end
 end
 
--- ===== КИТАЙСКАЯ ШЛЯПА (голографическая, без пульсации) =====
 local function ApplyHat()
     if hatConnection then hatConnection:Disconnect() hatConnection = nil end
     if hatModel then pcall(function() hatModel:Destroy() end) hatModel = nil end
     if not settings.hatEnabled then return end
-
     local char = Player.Character
     if not char then return end
     local head = char:FindFirstChild("Head")
@@ -415,7 +419,7 @@ local function ApplyDayNight()
     end
 end
 
--- ===== DEATH EFFECT (ускорен в 3 раза) =====
+-- ===== DEATH EFFECT =====
 local function playDeathEffect(character)
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
@@ -578,11 +582,185 @@ local function ApplyDeathEffect()
     end
 end
 
+-- ===== GTA WASTED =====
+local function resetWastedEffect()
+    if not wastedGui then return end
+    if wastedLabel then
+        TweenService:Create(wastedLabel, TweenInfo.new(0.7), {TextTransparency = 1}):Play()
+    end
+    if wastedBandFrame then
+        TweenService:Create(wastedBandFrame, TweenInfo.new(0.7), {BackgroundTransparency = 1}):Play()
+    end
+    if wastedBlackFrame then
+        TweenService:Create(wastedBlackFrame, TweenInfo.new(0.7), {BackgroundTransparency = 1}):Play()
+    end
+    if wastedBlur then
+        TweenService:Create(wastedBlur, TweenInfo.new(0.7), {Size = 0}):Play()
+    end
+    if wastedColorCorrection then
+        wastedColorCorrection.Saturation = 0
+        wastedColorCorrection.Contrast = 0
+        wastedColorCorrection.Brightness = 0
+    end
+    task.delay(0.8, function()
+        if wastedColorCorrection then wastedColorCorrection.Enabled = false end
+        if wastedBlur then wastedBlur.Enabled = false end
+    end)
+end
+
+local function playWastedEffect(character)
+    if wastedEffectRunning then return end
+    wastedEffectRunning = true
+
+    if wastedSound then wastedSound:Play() end
+
+    if wastedColorCorrection then
+        wastedColorCorrection.Enabled = true
+        wastedColorCorrection.Saturation = -1
+        wastedColorCorrection.Contrast = 1.2
+        wastedColorCorrection.Brightness = -0.25
+    end
+
+    if wastedBlur then
+        wastedBlur.Enabled = true
+        wastedBlur.Size = 0
+    end
+
+    if wastedBlackFrame then
+        TweenService:Create(wastedBlackFrame, TweenInfo.new(1.8, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.4}):Play()
+    end
+    if wastedBandFrame then
+        TweenService:Create(wastedBandFrame, TweenInfo.new(1.8, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.35}):Play()
+    end
+    if wastedBlur then
+        task.delay(0.8, function()
+            TweenService:Create(wastedBlur, TweenInfo.new(2.2, Enum.EasingStyle.Sine), {Size = 24}):Play()
+        end)
+    end
+
+    task.wait(0.5)
+    if wastedLabel then
+        TweenService:Create(wastedLabel, TweenInfo.new(1.1, Enum.EasingStyle.Back), {TextTransparency = 0}):Play()
+    end
+
+    local startTime = tick()
+    local duration = 5.5
+    if wastedConnection then wastedConnection:Disconnect() end
+    wastedConnection = RunService.RenderStepped:Connect(function()
+        local elapsed = tick() - startTime
+        if elapsed > duration then
+            if wastedConnection then wastedConnection:Disconnect() wastedConnection = nil end
+            return
+        end
+        if not character or not character.Parent then return end
+        local root = character:FindFirstChild("HumanoidRootPart")
+            or character:FindFirstChild("UpperTorso")
+            or character:FindFirstChild("Torso")
+            or character:FindFirstChild("Head")
+        if not root then return end
+        local t = math.clamp(elapsed / duration, 0, 1)
+        local eased = 1 - (1 - t) * (1 - t)
+        local height = eased * 12
+        local angle = elapsed * 0.5
+        local radius = 8 + eased * 4
+        local focus = root.Position
+        local offset = Vector3.new(math.sin(angle) * radius, height + 3, math.cos(angle) * radius)
+        Camera.CFrame = CFrame.new(focus + offset, focus)
+        Camera.Focus = CFrame.new(focus)
+    end)
+
+    task.delay(duration + 0.5, function()
+        if wastedConnection then wastedConnection:Disconnect() wastedConnection = nil end
+        resetWastedEffect()
+        wastedEffectRunning = false
+    end)
+end
+
+local function ApplyWasted()
+    if wastedConnection then wastedConnection:Disconnect() wastedConnection = nil end
+    if wastedGui then pcall(function() wastedGui:Destroy() end) wastedGui = nil end
+    if wastedColorCorrection then pcall(function() wastedColorCorrection:Destroy() end) wastedColorCorrection = nil end
+    if wastedBlur then pcall(function() wastedBlur:Destroy() end) wastedBlur = nil end
+    if wastedSound then pcall(function() wastedSound:Destroy() end) wastedSound = nil end
+
+    if not settings.wastedEnabled then return end
+
+    wastedGui = Instance.new("ScreenGui")
+    wastedGui.Name = "WastedGui"
+    wastedGui.IgnoreGuiInset = true
+    wastedGui.ResetOnSpawn = false
+    wastedGui.Parent = Player:WaitForChild("PlayerGui")
+
+    wastedBlackFrame = Instance.new("Frame")
+    wastedBlackFrame.Size = UDim2.new(1, 0, 1, 0)
+    wastedBlackFrame.BackgroundColor3 = BLACK
+    wastedBlackFrame.BackgroundTransparency = 1
+    wastedBlackFrame.BorderSizePixel = 0
+    wastedBlackFrame.ZIndex = 1
+    wastedBlackFrame.Parent = wastedGui
+
+    wastedBandFrame = Instance.new("Frame")
+    wastedBandFrame.Size = UDim2.new(1, 0, 0.18, 0)
+    wastedBandFrame.Position = UDim2.new(0, 0, 0.41, 0)
+    wastedBandFrame.BackgroundColor3 = BLACK
+    wastedBandFrame.BackgroundTransparency = 1
+    wastedBandFrame.BorderSizePixel = 0
+    wastedBandFrame.ZIndex = 2
+    wastedBandFrame.Parent = wastedGui
+
+    wastedLabel = Instance.new("TextLabel")
+    wastedLabel.Size = UDim2.new(0.6, 0, 1, 0)
+    wastedLabel.Position = UDim2.new(0.2, 0, 0, 0)
+    wastedLabel.BackgroundTransparency = 1
+    wastedLabel.Text = "WASTED"
+    wastedLabel.TextColor3 = Color3.fromRGB(180, 0, 0)
+    wastedLabel.TextStrokeTransparency = 0.3
+    wastedLabel.TextStrokeColor3 = BLACK
+    wastedLabel.Font = Enum.Font.GothamBold
+    wastedLabel.TextScaled = true
+    wastedLabel.TextTransparency = 1
+    wastedLabel.ZIndex = 3
+    wastedLabel.Parent = wastedBandFrame
+
+    wastedColorCorrection = Instance.new("ColorCorrectionEffect")
+    wastedColorCorrection.Name = "WastedEffect"
+    wastedColorCorrection.Enabled = false
+    wastedColorCorrection.Parent = Lighting
+
+    wastedBlur = Instance.new("BlurEffect")
+    wastedBlur.Name = "WastedBlur"
+    wastedBlur.Size = 0
+    wastedBlur.Enabled = false
+    wastedBlur.Parent = Lighting
+
+    wastedSound = Instance.new("Sound")
+    wastedSound.Name = "WastedSound"
+    wastedSound.SoundId = "rbxassetid://5256796890"
+    wastedSound.Volume = 1.5
+    wastedSound.PlaybackSpeed = 1
+    wastedSound.Parent = SoundService
+
+    local function setupChar(char)
+        local hum = char:WaitForChild("Humanoid", 5)
+        if not hum then return end
+        hum.Died:Connect(function()
+            if settings.wastedEnabled then
+                playWastedEffect(char)
+            end
+        end)
+    end
+    if Player.Character then setupChar(Player.Character) end
+    Player.CharacterAdded:Connect(function(char)
+        task.wait(1)
+        if settings.wastedEnabled then setupChar(char) end
+    end)
+end
+
 task.spawn(function()
     if not Player.Character then Player.CharacterAdded:Wait() end
     task.wait(0.5)
     ApplyFOV() ApplyParticles() ApplyFog() ApplySky()
-    ApplySkyParticles() ApplyTrails() ApplyHeadless() ApplyRTX() ApplyGlow() ApplyAura() ApplyDayNight() ApplyDeathEffect() ApplyHat()
+    ApplySkyParticles() ApplyTrails() ApplyHeadless() ApplyRTX() ApplyGlow() ApplyAura() ApplyDayNight() ApplyDeathEffect() ApplyHat() ApplyWasted()
 end)
 Player.CharacterAdded:Connect(function()
     task.wait(1)
@@ -1044,6 +1222,9 @@ local dayNightFunc = {name="Ночь / День", desc="Переключить �
 local deathEffectFunc = {name="Death Effect", desc="Туман и неоновый столб при смерти.", getState=function() return settings.deathEffectEnabled end,
     callback=function(on) settings.deathEffectEnabled=on ApplyDeathEffect() end}
 
+local wastedFunc = {name="GTA Wasted", desc="Ч/б экран, WASTED и подъём камеры при смерти.", getState=function() return settings.wastedEnabled end,
+    callback=function(on) settings.wastedEnabled=on ApplyWasted() end}
+
 local rtxShadowsFunc = {name="RTX Тени", desc="Реалистичные тени + атмосфера.", getState=function() return settings.rtxShadowsEnabled end,
     settings=function() openSettings("RTX Тени", {{name="Сила", min=0.1, max=1, default=settings.rtxShadowsIntensity, callback=function(v) settings.rtxShadowsIntensity=v ApplyRTX() end}}) end,
     callback=function(on) settings.rtxShadowsEnabled=on ApplyRTX() end}
@@ -1342,7 +1523,7 @@ end
 
 catButtons[1].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Визуал"
-    createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, fogFunc, skyShaderFunc, dayNightFunc, deathEffectFunc})
+    createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, fogFunc, skyShaderFunc, dayNightFunc, deathEffectFunc, wastedFunc})
 end)
 catButtons[2].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Косметика"
