@@ -608,7 +608,7 @@ local function ApplyDeathEffect()
     end
 end
 
--- ===== GTA WASTED (ускорен под респавн) =====
+-- ===== GTA WASTED (ускорен под респавн, камера медленнее) =====
 local function resetWastedEffect()
     if not wastedGui then return end
     if wastedLabel then
@@ -690,7 +690,8 @@ local function playWastedEffect(character)
         local t = math.clamp(elapsed / duration, 0, 1)
         local eased = 1 - (1 - t) * (1 - t)
         local height = eased * 12
-        local angle = elapsed * 0.9  -- вращение быстрее (было 0.5)
+        -- Медленное кружение: ~1.9 рад (~110°) за 3.5с
+        local angle = elapsed * 0.55
         local radius = 8 + eased * 4
         local focus = root.Position
         local offset = Vector3.new(math.sin(angle) * radius, height + 3, math.cos(angle) * radius)
