@@ -608,27 +608,27 @@ local function ApplyDeathEffect()
     end
 end
 
--- ===== GTA WASTED =====
+-- ===== GTA WASTED (ускорен под респавн) =====
 local function resetWastedEffect()
     if not wastedGui then return end
     if wastedLabel then
-        TweenService:Create(wastedLabel, TweenInfo.new(0.7), {TextTransparency = 1}):Play()
+        TweenService:Create(wastedLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
     end
     if wastedBandFrame then
-        TweenService:Create(wastedBandFrame, TweenInfo.new(0.7), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(wastedBandFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
     end
     if wastedBlackFrame then
-        TweenService:Create(wastedBlackFrame, TweenInfo.new(0.7), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(wastedBlackFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
     end
     if wastedBlur then
-        TweenService:Create(wastedBlur, TweenInfo.new(0.7), {Size = 0}):Play()
+        TweenService:Create(wastedBlur, TweenInfo.new(0.3), {Size = 0}):Play()
     end
     if wastedColorCorrection then
         wastedColorCorrection.Saturation = 0
         wastedColorCorrection.Contrast = 0
         wastedColorCorrection.Brightness = 0
     end
-    task.delay(0.8, function()
+    task.delay(0.35, function()
         if wastedColorCorrection then wastedColorCorrection.Enabled = false end
         if wastedBlur then wastedBlur.Enabled = false end
     end)
@@ -652,25 +652,28 @@ local function playWastedEffect(character)
         wastedBlur.Size = 0
     end
 
+    -- Чёрные полосы появляются быстрее (0.6с вместо 1.8с)
     if wastedBlackFrame then
-        TweenService:Create(wastedBlackFrame, TweenInfo.new(1.8, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.4}):Play()
+        TweenService:Create(wastedBlackFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.4}):Play()
     end
     if wastedBandFrame then
-        TweenService:Create(wastedBandFrame, TweenInfo.new(1.8, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.35}):Play()
+        TweenService:Create(wastedBandFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.35}):Play()
     end
+    -- Блюр быстрее (0.8с вместо 2.2с)
     if wastedBlur then
-        task.delay(0.8, function()
-            TweenService:Create(wastedBlur, TweenInfo.new(2.2, Enum.EasingStyle.Sine), {Size = 24}):Play()
+        task.delay(0.2, function()
+            TweenService:Create(wastedBlur, TweenInfo.new(0.8, Enum.EasingStyle.Sine), {Size = 24}):Play()
         end)
     end
 
-    task.wait(0.5)
+    -- Текст WASTED появляется быстрее (0.2с задержка + 0.5с анимация)
+    task.wait(0.2)
     if wastedLabel then
-        TweenService:Create(wastedLabel, TweenInfo.new(1.1, Enum.EasingStyle.Back), {TextTransparency = 0}):Play()
+        TweenService:Create(wastedLabel, TweenInfo.new(0.5, Enum.EasingStyle.Back), {TextTransparency = 0}):Play()
     end
 
     local startTime = tick()
-    local duration = 5.5
+    local duration = 3.5  -- короче чтобы успеть до респавна
     if wastedConnection then wastedConnection:Disconnect() end
     wastedConnection = RunService.RenderStepped:Connect(function()
         local elapsed = tick() - startTime
@@ -687,7 +690,7 @@ local function playWastedEffect(character)
         local t = math.clamp(elapsed / duration, 0, 1)
         local eased = 1 - (1 - t) * (1 - t)
         local height = eased * 12
-        local angle = elapsed * 0.5
+        local angle = elapsed * 0.9  -- вращение быстрее (было 0.5)
         local radius = 8 + eased * 4
         local focus = root.Position
         local offset = Vector3.new(math.sin(angle) * radius, height + 3, math.cos(angle) * radius)
@@ -695,7 +698,7 @@ local function playWastedEffect(character)
         Camera.Focus = CFrame.new(focus)
     end)
 
-    task.delay(duration + 0.5, function()
+    task.delay(duration + 0.2, function()
         if wastedConnection then wastedConnection:Disconnect() wastedConnection = nil end
         resetWastedEffect()
         wastedEffectRunning = false
@@ -1457,7 +1460,8 @@ local function showThemes()
             else
                 themeIsClear = false
                 themeHue = t.hue
-            end            updateTheme()
+            end
+            updateTheme()
             SaveConfig()
         end)
     end
