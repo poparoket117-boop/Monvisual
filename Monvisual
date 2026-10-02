@@ -18,7 +18,7 @@ local Camera = workspace.CurrentCamera
 
 -- Родное время респавна (чтобы скрипт не влиял на респавн)
 pcall(function()
-    Players.RespawnTime = 6
+    Players.RespawnTime = 8
     Players.CharacterAutoLoads = true
 end)
 
