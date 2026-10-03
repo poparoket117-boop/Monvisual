@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v47)
+-- Monvisual GUI (Final v48)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -875,27 +875,40 @@ Main.BackgroundTransparency = getTransparency()
 Main.BorderSizePixel = 0
 Main.Active = false
 Main.Visible = false
+Main.AnchorPoint = Vector2.new(0.5, 0.5)
 local mainCorner = Instance.new("UICorner", Main)
 mainCorner.CornerRadius = UDim.new(0, 18)
 
+-- НОВАЯ АНИМАЦИЯ МЕНЮ: вылет слева с поворотом + прозрачность
 local function toggleMenu(show)
     if show then
         Main.Visible = true
-        Main.Size = UDim2.new(0, 0, 0, 0)
-        Main.Position = UDim2.new(0.5, 0, 0.5, 0)
-        TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, 700, 0, 420),
-            Position = UDim2.new(0.5, -350, 0.5, -210)
+        Main.AnchorPoint = Vector2.new(0.5, 0.5)
+        -- Стартовое положение: слева за экраном, маленький, повёрнут
+        Main.Size = UDim2.new(0, 700, 0, 420)
+        Main.Position = UDim2.new(-0.5, 0, 0.5, 0)  -- слева за экраном
+        Main.Rotation = -15
+        Main.BackgroundTransparency = 1
+        -- Анимируем вылет в центр
+        TweenService:Create(Main, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+            Rotation = 0,
+            BackgroundTransparency = getTransparency()
         }):Play()
-        TweenService:Create(uiBlur, TweenInfo.new(0.3), {Size = 20}):Play()
+        TweenService:Create(uiBlur, TweenInfo.new(0.35), {Size = 20}):Play()
     else
-        local tween = TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0)
+        -- Улетает вправо за экран
+        local tween = TweenService:Create(Main, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Position = UDim2.new(1.5, 0, 0.5, 0),
+            Rotation = 15,
+            BackgroundTransparency = 1
         })
         tween:Play()
-        TweenService:Create(uiBlur, TweenInfo.new(0.25), {Size = 0}):Play()
-        tween.Completed:Connect(function() Main.Visible = false end)
+        TweenService:Create(uiBlur, TweenInfo.new(0.3), {Size = 0}):Play()
+        tween.Completed:Connect(function()
+            Main.Visible = false
+            Main.Rotation = 0
+        end)
     end
 end
 
@@ -1005,7 +1018,9 @@ local function updateTheme()
     local trans = getTransparency()
 
     Main.BackgroundColor3 = getThemeColor()
-    Main.BackgroundTransparency = trans
+    if Main.Visible then
+        Main.BackgroundTransparency = trans
+    end
     SideBar.BackgroundColor3 = getThemeColor()
     SideBar.BackgroundTransparency = trans
     Stroke.Color = accent
@@ -1609,7 +1624,7 @@ local function showThemes()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- ===== РАДИО =====
+-- ===== РАДИО (без лимита) =====
 local function showRadio()
     SectionTitle.Text = "Радио"
     for _, child in ipairs(CardContainer:GetChildren()) do
@@ -1646,14 +1661,7 @@ local function showRadio()
     end
 
     local idBox = makeField("Айди песни")
-    local nameBox = makeField("Название (макс. 5)")
-
-    -- Ограничение ввода названия до 5 символов в реальном времени
-    nameBox:GetPropertyChangedSignal("Text"):Connect(function()
-        if #nameBox.Text > 5 then
-            nameBox.Text = string.sub(nameBox.Text, 1, 5)
-        end
-    end)
+    local nameBox = makeField("Название")
 
     local btnCard = Instance.new("Frame", CardContainer)
     btnCard.Size = UDim2.new(0.96, 0, 0, 40)
@@ -1698,8 +1706,7 @@ local function showRadio()
         local idText = idBox.Text:gsub("%D", "")
         local nameText = nameBox.Text
         if idText == "" then return end
-        if nameText == "" then nameText = "Trk" end
-        if #nameText > 5 then nameText = string.sub(nameText, 1, 5) end
+        if nameText == "" then nameText = "Track " .. idText end
         table.insert(radioSongs, {id = tonumber(idText), name = nameText})
         SaveRadio()
         idBox.Text = ""
@@ -1876,7 +1883,7 @@ catButtons[6].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- ===== ДИНАМИК (по центру у края, сужается при радио) =====
+-- ===== ДИНАМИК (сужается до 165) =====
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 200, 0, 30)
 OpenBtn.Position = UDim2.new(0.5, 0, 0, 0)
@@ -1906,7 +1913,6 @@ SpeakerLabel.TextTruncate = Enum.TextTruncate.AtEnd
 SpeakerLabel.TextStrokeTransparency = 1
 SpeakerLabel.ZIndex = 3
 
--- Следим за состоянием радио для плавного сужения/расширения
 local wasRadioPlaying = false
 RunService.RenderStepped:Connect(function(dt)
     if radioIsPlaying and radioSound and radioSongs[radioCurrentIndex] then
@@ -1922,7 +1928,7 @@ RunService.RenderStepped:Connect(function(dt)
         wasRadioPlaying = nowPlaying
         local targetSize
         if nowPlaying then
-            targetSize = UDim2.new(0, 100, 0, 30)
+            targetSize = UDim2.new(0, 165, 0, 30)  -- сужается до 165
         else
             targetSize = UDim2.new(0, 200, 0, 30)
         end
@@ -1932,7 +1938,6 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- Плавное скрытие динамика при открытии меню
 local speakerAnimating = false
 
 local function animateSpeaker(show)
@@ -1977,4 +1982,4 @@ updateTheme()
 
 catButtons[1].MouseButton1Click:Fire()
 
-print("Monvisual loaded! (Radio v47)")
+print("Monvisual loaded! (Radio v48)")
