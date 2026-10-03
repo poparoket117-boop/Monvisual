@@ -1,9 +1,12 @@
--- Monvisual GUI (Final v48)
+-- Monvisual GUI (Final v49)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
 end
 _G.Monvisual_Loaded = true
+
+-- Флаг автозагрузки Free Animations (сохраняется между перезапусками скрипта в одной сессии)
+_G.Monvisual_FreeAnimsLoaded = _G.Monvisual_FreeAnimsLoaded or false
 
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -141,8 +144,6 @@ local wastedGui, wastedLabel, wastedBandFrame, wastedBlackFrame
 local wastedColorCorrection, wastedBlur, wastedSound
 local wastedConnection = nil
 local wastedEffectRunning = false
-
-local freeAnimsLoaded = false
 
 local radioSound = nil
 local radioIsPlaying = false
@@ -879,17 +880,15 @@ Main.AnchorPoint = Vector2.new(0.5, 0.5)
 local mainCorner = Instance.new("UICorner", Main)
 mainCorner.CornerRadius = UDim.new(0, 18)
 
--- НОВАЯ АНИМАЦИЯ МЕНЮ: вылет слева с поворотом + прозрачность
+-- НОВАЯ АНИМАЦИЯ МЕНЮ: вылет слева с поворотом
 local function toggleMenu(show)
     if show then
         Main.Visible = true
         Main.AnchorPoint = Vector2.new(0.5, 0.5)
-        -- Стартовое положение: слева за экраном, маленький, повёрнут
         Main.Size = UDim2.new(0, 700, 0, 420)
-        Main.Position = UDim2.new(-0.5, 0, 0.5, 0)  -- слева за экраном
+        Main.Position = UDim2.new(-0.5, 0, 0.5, 0)
         Main.Rotation = -15
         Main.BackgroundTransparency = 1
-        -- Анимируем вылет в центр
         TweenService:Create(Main, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Position = UDim2.new(0.5, 0, 0.5, 0),
             Rotation = 0,
@@ -897,7 +896,6 @@ local function toggleMenu(show)
         }):Play()
         TweenService:Create(uiBlur, TweenInfo.new(0.35), {Size = 20}):Play()
     else
-        -- Улетает вправо за экран
         local tween = TweenService:Create(Main, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
             Position = UDim2.new(1.5, 0, 0.5, 0),
             Rotation = 15,
@@ -1624,7 +1622,7 @@ local function showThemes()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- ===== РАДИО (без лимита) =====
+-- ===== РАДИО =====
 local function showRadio()
     SectionTitle.Text = "Радио"
     for _, child in ipairs(CardContainer:GetChildren()) do
@@ -1815,6 +1813,19 @@ local function showRadio()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
+-- ===== FREE ANIMATIONS =====
+local function loadFreeAnimations()
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/refs/heads/main/BundleAnimations.lua"))()
+    end)
+    if not ok then
+        warn("[Monvisual] Free Animations load error: " .. tostring(err))
+        _G.Monvisual_FreeAnimsLoaded = false
+        return false
+    end
+    return true
+end
+
 catButtons[1].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Визуал"
     createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, fogFunc, skyShaderFunc, dayNightFunc, deathEffectFunc, wastedFunc})
@@ -1828,12 +1839,12 @@ catButtons[3].MouseButton1Click:Connect(function()
     createCards({rtxShadowsFunc, rtxReflectionsFunc, glowFunc, auraFunc})
 end)
 catButtons[4].MouseButton1Click:Connect(function()
-    if freeAnimsLoaded then return end
+    if _G.Monvisual_FreeAnimsLoaded then return end
     SectionTitle.Text = "Анимации"
     for _, child in ipairs(CardContainer:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
     end
-    freeAnimsLoaded = true
+    _G.Monvisual_FreeAnimsLoaded = true
     local card = Instance.new("Frame", CardContainer)
     card.BackgroundColor3 = getThemeColor()
     card.BackgroundTransparency = getTransparency()
@@ -1866,21 +1877,22 @@ catButtons[4].MouseButton1Click:Connect(function()
     desc.TextStrokeTransparency = 1
     task.wait()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
-    task.spawn(function()
-        local ok, err = pcall(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/refs/heads/main/BundleAnimations.lua"))()
-        end)
-        if not ok then
-            warn("[Monvisual] Free Animations load error: " .. tostring(err))
-            freeAnimsLoaded = false
-        end
-    end)
+    task.spawn(loadFreeAnimations)
 end)
 catButtons[5].MouseButton1Click:Connect(function()
     showRadio()
 end)
 catButtons[6].MouseButton1Click:Connect(function()
     showThemes()
+end)
+
+-- ===== АВТОЗАГРУЗКА FREE ANIMATIONS =====
+-- Если уже кликали на вкладку "Анимации" в этой сессии — грузим автоматически
+task.spawn(function()
+    task.wait(1)
+    if _G.Monvisual_FreeAnimsLoaded then
+        loadFreeAnimations()
+    end
 end)
 
 -- ===== ДИНАМИК (сужается до 165) =====
@@ -1982,4 +1994,4 @@ updateTheme()
 
 catButtons[1].MouseButton1Click:Fire()
 
-print("Monvisual loaded! (Radio v48)")
+print("Monvisual loaded! (Radio v49)")
