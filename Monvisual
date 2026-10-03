@@ -1871,7 +1871,6 @@ end)
 catButtons[6].MouseButton1Click:Connect(function()
     showThemes()
 end)
-
 -- ===== ДИНАМИК =====
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 200, 0, 30)
