@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v45)
+-- Monvisual GUI (Final v47)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -1646,7 +1646,14 @@ local function showRadio()
     end
 
     local idBox = makeField("Айди песни")
-    local nameBox = makeField("Название")
+    local nameBox = makeField("Название (макс. 5)")
+
+    -- Ограничение ввода названия до 5 символов в реальном времени
+    nameBox:GetPropertyChangedSignal("Text"):Connect(function()
+        if #nameBox.Text > 5 then
+            nameBox.Text = string.sub(nameBox.Text, 1, 5)
+        end
+    end)
 
     local btnCard = Instance.new("Frame", CardContainer)
     btnCard.Size = UDim2.new(0.96, 0, 0, 40)
@@ -1691,7 +1698,8 @@ local function showRadio()
         local idText = idBox.Text:gsub("%D", "")
         local nameText = nameBox.Text
         if idText == "" then return end
-        if nameText == "" then nameText = "Track " .. idText end
+        if nameText == "" then nameText = "Trk" end
+        if #nameText > 5 then nameText = string.sub(nameText, 1, 5) end
         table.insert(radioSongs, {id = tonumber(idText), name = nameText})
         SaveRadio()
         idBox.Text = ""
@@ -1867,19 +1875,8 @@ end)
 catButtons[6].MouseButton1Click:Connect(function()
     showThemes()
 end)
--- ===== ДИНАМИК (по центру, чуть ниже края, плавное скрытие) =====
-local OpenBtn = Instance.new("TextButton", ScreenGui)
-OpenBtn.Size = UDim2.new(0, 200, 0, 30)
-OpenBtn.Position = UDim2.new(0.5, 0, 0.01, 0)
-OpenBtn.AnchorPoint = Vector2.new(0.5, 0)
-OpenBtn.BackgroundColor3 = BLACK
-OpenBtn.BackgroundTransparency = 0
-OpenBtn.TextColor3 = WHITE
-OpenBtn.TextSize = 12
-OpenBtn.Font = Enum.Font.GothamBold
-OpenBtn.BorderSizePixel = 0
-OpenBtn.Text = ""
--- ===== ДИНАМИК (у края, сужается при радио) =====
+
+-- ===== ДИНАМИК (по центру у края, сужается при радио) =====
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 200, 0, 30)
 OpenBtn.Position = UDim2.new(0.5, 0, 0, 0)
@@ -1909,7 +1906,7 @@ SpeakerLabel.TextTruncate = Enum.TextTruncate.AtEnd
 SpeakerLabel.TextStrokeTransparency = 1
 SpeakerLabel.ZIndex = 3
 
--- Отслеживание состояния "радио играет" для плавного сужения
+-- Следим за состоянием радио для плавного сужения/расширения
 local wasRadioPlaying = false
 RunService.RenderStepped:Connect(function(dt)
     if radioIsPlaying and radioSound and radioSongs[radioCurrentIndex] then
@@ -1920,15 +1917,14 @@ RunService.RenderStepped:Connect(function(dt)
         SpeakerLabel.TextSize = 12
     end
 
-    -- Плавное сужение/расширение динамика при старте/стопе радио
     local nowPlaying = radioIsPlaying and radioSound ~= nil
     if nowPlaying ~= wasRadioPlaying then
         wasRadioPlaying = nowPlaying
         local targetSize
         if nowPlaying then
-            targetSize = UDim2.new(0, 100, 0, 30)  -- сужается в 2 раза
+            targetSize = UDim2.new(0, 100, 0, 30)
         else
-            targetSize = UDim2.new(0, 200, 0, 30)  -- обратно
+            targetSize = UDim2.new(0, 200, 0, 30)
         end
         TweenService:Create(OpenBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             Size = targetSize
@@ -1936,7 +1932,7 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- Плавная анимация скрытия динамика при открытии меню
+-- Плавное скрытие динамика при открытии меню
 local speakerAnimating = false
 
 local function animateSpeaker(show)
@@ -1945,7 +1941,7 @@ local function animateSpeaker(show)
 
     local targetY
     if show then
-        targetY = -0.05  -- уезжает за верх экрана
+        targetY = -0.05
     else
         targetY = 0
     end
