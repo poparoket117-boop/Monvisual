@@ -122,6 +122,9 @@ local wastedColorCorrection, wastedBlur, wastedSound
 local wastedConnection = nil
 local wastedEffectRunning = false
 
+-- FREE ANIMATIONS
+local freeAnimsLoaded = false
+
 local fpsValue = 60
 local fpsCounter = 0
 local fpsTimer = tick()
@@ -595,7 +598,6 @@ local function ApplyDeathEffect()
         table.insert(deathConnections, conn)
     end
     local function setupPlayer(player)
-        -- Пропускаем локального игрока — эффект только на других
         if player == Player then return end
         local c1 = player.CharacterAdded:Connect(setupCharacter)
         table.insert(deathConnections, c1)
@@ -608,7 +610,7 @@ local function ApplyDeathEffect()
     end
 end
 
--- ===== GTA WASTED (ускорен под респавн, камера медленнее) =====
+-- ===== GTA WASTED =====
 local function resetWastedEffect()
     if not wastedGui then return end
     if wastedLabel then
@@ -652,28 +654,25 @@ local function playWastedEffect(character)
         wastedBlur.Size = 0
     end
 
-    -- Чёрные полосы появляются быстрее (0.6с вместо 1.8с)
     if wastedBlackFrame then
         TweenService:Create(wastedBlackFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.4}):Play()
     end
     if wastedBandFrame then
         TweenService:Create(wastedBandFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.35}):Play()
     end
-    -- Блюр быстрее (0.8с вместо 2.2с)
     if wastedBlur then
         task.delay(0.2, function()
             TweenService:Create(wastedBlur, TweenInfo.new(0.8, Enum.EasingStyle.Sine), {Size = 24}):Play()
         end)
     end
 
-    -- Текст WASTED появляется быстрее (0.2с задержка + 0.5с анимация)
     task.wait(0.2)
     if wastedLabel then
         TweenService:Create(wastedLabel, TweenInfo.new(0.5, Enum.EasingStyle.Back), {TextTransparency = 0}):Play()
     end
 
     local startTime = tick()
-    local duration = 3.5  -- короче чтобы успеть до респавна
+    local duration = 3.5
     if wastedConnection then wastedConnection:Disconnect() end
     wastedConnection = RunService.RenderStepped:Connect(function()
         local elapsed = tick() - startTime
@@ -690,7 +689,6 @@ local function playWastedEffect(character)
         local t = math.clamp(elapsed / duration, 0, 1)
         local eased = 1 - (1 - t) * (1 - t)
         local height = eased * 12
-        -- Медленное кружение: ~1.9 рад (~110°) за 3.5с
         local angle = elapsed * 0.55
         local radius = 8 + eased * 4
         local focus = root.Position
@@ -867,7 +865,7 @@ Logo.TextColor3 = WHITE
 Logo.TextSize = 18
 Logo.Font = Enum.Font.GothamBold
 
-local categories = {"Визуал", "Косметика", "Шейдеры", "Темы"}
+local categories = {"Визуал", "Косметика", "Шейдеры", "Анимации", "Темы"}
 local catButtons = {}
 local catY = 130
 for _, name in ipairs(categories) do
@@ -1563,7 +1561,60 @@ catButtons[3].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Шейдеры"
     createCards({rtxShadowsFunc, rtxReflectionsFunc, glowFunc, auraFunc})
 end)
+
+-- Вкладка "Анимации" — одноразовая: клик = загрузка скрипта, повторный клик игнорируется
 catButtons[4].MouseButton1Click:Connect(function()
+    if freeAnimsLoaded then return end  -- уже загружено — не даём нажать снова
+    SectionTitle.Text = "Анимации"
+    for _, child in ipairs(CardContainer:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    freeAnimsLoaded = true
+    -- статус-карточка
+    local card = Instance.new("Frame", CardContainer)
+    card.BackgroundColor3 = getThemeColor()
+    card.BackgroundTransparency = getTransparency()
+    card.BorderSizePixel = 0
+    local cc = Instance.new("UICorner", card)
+    cc.CornerRadius = UDim.new(0, 10)
+    local stroke = Instance.new("UIStroke", card)
+    stroke.Color = getAccentColor()
+    stroke.Thickness = 1
+    local title = Instance.new("TextLabel", card)
+    title.Size = UDim2.new(1, -16, 0, 20)
+    title.Position = UDim2.new(0, 8, 0, 5)
+    title.BackgroundTransparency = 1
+    title.Text = "✔ Free Animations загружены"
+    title.TextColor3 = WHITE
+    title.TextSize = 12
+    title.Font = Enum.Font.GothamBold
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    local desc = Instance.new("TextLabel", card)
+    desc.Size = UDim2.new(1, -16, 0, 24)
+    desc.Position = UDim2.new(0, 8, 0, 26)
+    desc.BackgroundTransparency = 1
+    desc.Text = "Скрипт запущен. Повторное нажатие вкладки отключено."
+    desc.TextColor3 = WHITE
+    desc.TextSize = 10
+    desc.Font = Enum.Font.Gotham
+    desc.TextWrapped = true
+    desc.TextXAlignment = Enum.TextXAlignment.Left
+    task.wait()
+    CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
+
+    -- загружаем скрипт
+    task.spawn(function()
+        local ok, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/refs/heads/main/BundleAnimations.lua"))()
+        end)
+        if not ok then
+            warn("[Monvisual] Free Animations load error: " .. tostring(err))
+            freeAnimsLoaded = false  -- если не удалось — разрешаем попробовать снова
+        end
+    end)
+end)
+
+catButtons[5].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
