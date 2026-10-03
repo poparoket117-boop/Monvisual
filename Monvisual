@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v39)
+-- Monvisual GUI (Final v41 - Radio fixed)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -16,7 +16,7 @@ local SoundService = game:GetService("SoundService")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- ===== РЕСПАВН ЧЕРЕЗ 6 СЕКУНД (форсированный) =====
+-- ===== РЕСПАВН ЧЕРЕЗ 6 СЕКУНД =====
 task.spawn(function()
     task.wait(1)
     if Players.CharacterAutoLoads then
@@ -80,7 +80,13 @@ local settings = {
     dayNightEnabled = false, dayNightTime = 12
 }
 
+local radioSongs = {}
+local radioCurrentIndex = 0
+local radioVolume = 1
+local radioLoop = false
+
 local CONFIG_FILE = "Monvisual_config.json"
+local RADIO_FILE = "Monvisual_radio.json"
 local function SaveConfig()
     local data = {}
     for k, v in pairs(settings) do
@@ -89,6 +95,8 @@ local function SaveConfig()
     end
     data.themeHue = themeHue
     data.themeIsClear = themeIsClear
+    data.radioVolume = radioVolume
+    data.radioLoop = radioLoop
     pcall(function() writefile(CONFIG_FILE, HttpService:JSONEncode(data)) end)
 end
 local function LoadConfig()
@@ -98,10 +106,23 @@ local function LoadConfig()
     for k, v in pairs(data) do
         if k == "themeHue" then themeHue = v
         elseif k == "themeIsClear" then themeIsClear = v
+        elseif k == "radioVolume" then radioVolume = v
+        elseif k == "radioLoop" then radioLoop = v
         elseif settings[k] ~= nil then settings[k] = v end
     end
 end
+local function SaveRadio()
+    pcall(function() writefile(RADIO_FILE, HttpService:JSONEncode(radioSongs)) end)
+end
+local function LoadRadio()
+    if not isfile(RADIO_FILE) then return end
+    local ok, data = pcall(function() return HttpService:JSONDecode(readfile(RADIO_FILE)) end)
+    if ok and type(data) == "table" then
+        radioSongs = data
+    end
+end
 LoadConfig()
+LoadRadio()
 
 local stretchCFrame = CFrame.new(0,0,0, 1,0,0, 0,settings.STRETCH_FACTOR,0, 0,0,1)
 local particleAttachment, particleEmitter
@@ -116,14 +137,15 @@ local deathConnections = {}
 local hatModel = nil
 local hatConnection = nil
 
--- WASTED переменные
 local wastedGui, wastedLabel, wastedBandFrame, wastedBlackFrame
 local wastedColorCorrection, wastedBlur, wastedSound
 local wastedConnection = nil
 local wastedEffectRunning = false
 
--- FREE ANIMATIONS
 local freeAnimsLoaded = false
+
+local radioSound = nil
+local radioIsPlaying = false
 
 local fpsValue = 60
 local fpsCounter = 0
@@ -446,7 +468,7 @@ local function ApplyDayNight()
     end
 end
 
--- ===== DEATH EFFECT (только на других игроков) =====
+-- ===== DEATH EFFECT =====
 local function playDeathEffect(character)
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
@@ -613,18 +635,10 @@ end
 -- ===== GTA WASTED =====
 local function resetWastedEffect()
     if not wastedGui then return end
-    if wastedLabel then
-        TweenService:Create(wastedLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
-    end
-    if wastedBandFrame then
-        TweenService:Create(wastedBandFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-    end
-    if wastedBlackFrame then
-        TweenService:Create(wastedBlackFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-    end
-    if wastedBlur then
-        TweenService:Create(wastedBlur, TweenInfo.new(0.3), {Size = 0}):Play()
-    end
+    if wastedLabel then TweenService:Create(wastedLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play() end
+    if wastedBandFrame then TweenService:Create(wastedBandFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play() end
+    if wastedBlackFrame then TweenService:Create(wastedBlackFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play() end
+    if wastedBlur then TweenService:Create(wastedBlur, TweenInfo.new(0.3), {Size = 0}):Play() end
     if wastedColorCorrection then
         wastedColorCorrection.Saturation = 0
         wastedColorCorrection.Contrast = 0
@@ -639,21 +653,17 @@ end
 local function playWastedEffect(character)
     if wastedEffectRunning then return end
     wastedEffectRunning = true
-
     if wastedSound then wastedSound:Play() end
-
     if wastedColorCorrection then
         wastedColorCorrection.Enabled = true
         wastedColorCorrection.Saturation = -1
         wastedColorCorrection.Contrast = 1.2
         wastedColorCorrection.Brightness = -0.25
     end
-
     if wastedBlur then
         wastedBlur.Enabled = true
         wastedBlur.Size = 0
     end
-
     if wastedBlackFrame then
         TweenService:Create(wastedBlackFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.4}):Play()
     end
@@ -665,12 +675,10 @@ local function playWastedEffect(character)
             TweenService:Create(wastedBlur, TweenInfo.new(0.8, Enum.EasingStyle.Sine), {Size = 24}):Play()
         end)
     end
-
     task.wait(0.2)
     if wastedLabel then
         TweenService:Create(wastedLabel, TweenInfo.new(0.5, Enum.EasingStyle.Back), {TextTransparency = 0}):Play()
     end
-
     local startTime = tick()
     local duration = 3.5
     if wastedConnection then wastedConnection:Disconnect() end
@@ -696,7 +704,6 @@ local function playWastedEffect(character)
         Camera.CFrame = CFrame.new(focus + offset, focus)
         Camera.Focus = CFrame.new(focus)
     end)
-
     task.delay(duration + 0.2, function()
         if wastedConnection then wastedConnection:Disconnect() wastedConnection = nil end
         resetWastedEffect()
@@ -710,7 +717,6 @@ local function ApplyWasted()
     if wastedColorCorrection then pcall(function() wastedColorCorrection:Destroy() end) wastedColorCorrection = nil end
     if wastedBlur then pcall(function() wastedBlur:Destroy() end) wastedBlur = nil end
     if wastedSound then pcall(function() wastedSound:Destroy() end) wastedSound = nil end
-
     if not settings.wastedEnabled then return end
 
     wastedGui = Instance.new("ScreenGui")
@@ -784,6 +790,55 @@ local function ApplyWasted()
     end)
 end
 
+-- ===== RADIO =====
+local function stopRadio()
+    if radioSound then
+        pcall(function() radioSound:Stop() end)
+        pcall(function() radioSound:Destroy() end)
+        radioSound = nil
+    end
+    radioIsPlaying = false
+end
+
+local function playRadioIndex(index)
+    if #radioSongs == 0 then return end
+    if index < 1 then index = #radioSongs end
+    if index > #radioSongs then index = 1 end
+    radioCurrentIndex = index
+    stopRadio()
+    local song = radioSongs[index]
+    radioSound = Instance.new("Sound")
+    radioSound.Name = "MonvisualRadioSound"
+    radioSound.SoundId = "rbxassetid://" .. tostring(song.id)
+    radioSound.Volume = radioVolume
+    radioSound.Looped = false
+    radioSound.Parent = SoundService
+    radioSound:Play()
+    radioIsPlaying = true
+    radioSound.Ended:Connect(function()
+        if not radioIsPlaying then return end
+        if radioLoop then
+            playRadioIndex(radioCurrentIndex)
+        else
+            if radioCurrentIndex < #radioSongs then
+                playRadioIndex(radioCurrentIndex + 1)
+            else
+                stopRadio()
+            end
+        end
+    end)
+end
+
+local function toggleRadioPlay()
+    if radioIsPlaying then
+        stopRadio()
+    else
+        if #radioSongs > 0 then
+            playRadioIndex(radioCurrentIndex > 0 and radioCurrentIndex or 1)
+        end
+    end
+end
+
 task.spawn(function()
     if not Player.Character then Player.CharacterAdded:Wait() end
     task.wait(0.5)
@@ -800,7 +855,6 @@ RunService.RenderStepped:Connect(function()
         Camera.CFrame = Camera.CFrame * stretchCFrame
     end
 end)
-
 -- ================== GUI ==================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Monvisual"
@@ -865,7 +919,7 @@ Logo.TextColor3 = WHITE
 Logo.TextSize = 18
 Logo.Font = Enum.Font.GothamBold
 
-local categories = {"Визуал", "Косметика", "Шейдеры", "Анимации", "Темы"}
+local categories = {"Визуал", "Косметика", "Шейдеры", "Анимации", "Радио", "Темы"}
 local catButtons = {}
 local catY = 130
 for _, name in ipairs(categories) do
@@ -1140,9 +1194,10 @@ local function createCards(list)
             setBtn.Size = UDim2.new(0, 20, 0, 20)
             setBtn.Position = UDim2.new(1, -50, 0, 5)
             setBtn.BackgroundColor3 = getAccentColor()
-            setBtn.Text = "⚙"
+            setBtn.Text = "S"
             setBtn.TextColor3 = WHITE
             setBtn.TextSize = 12
+            setBtn.Font = Enum.Font.GothamBold
             setBtn.BorderSizePixel = 0
             local setCorner = Instance.new("UICorner", setBtn)
             setCorner.CornerRadius = UDim.new(0, 5)
@@ -1189,7 +1244,7 @@ local function createCards(list)
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- ФУНКЦИИ
+-- ФУНКЦИИ КАРТОЧЕК
 local fovFunc = {name="FOV", desc="Меняет поле зрения.", getState=function() return settings.fovEnabled end,
     settings=function() openSettings("FOV", {{name="FOV", min=30, max=120, default=settings.fovValue, callback=function(v) settings.fovValue=v ApplyFOV() end}}) end,
     callback=function(on) settings.fovEnabled=on ApplyFOV() end}
@@ -1359,7 +1414,6 @@ RunService.Heartbeat:Connect(function()
         espTargetCFrame = nil
     end
 end)
-
 RunService.Heartbeat:Connect(function()
     if not settings.particlesEnabled then return end
     if not particleEmitter or not particleEmitter.Parent then
@@ -1549,6 +1603,357 @@ local function showThemes()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
+-- ===== РАДИО: МЕНЮ =====
+local function showRadio()
+    SectionTitle.Text = "Радио"
+    for _, child in ipairs(CardContainer:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+
+    -- Ряд 1: ID
+    local idCard = Instance.new("Frame", CardContainer)
+    idCard.Size = UDim2.new(0.96, 0, 0, 46)
+    idCard.BackgroundColor3 = getThemeColor()
+    idCard.BackgroundTransparency = getTransparency()
+    idCard.BorderSizePixel = 0
+    local ic = Instance.new("UICorner", idCard)
+    ic.CornerRadius = UDim.new(0, 8)
+    local istroke = Instance.new("UIStroke", idCard)
+    istroke.Color = getAccentColor()
+    istroke.Thickness = 1
+
+    local idBox = Instance.new("TextBox", idCard)
+    idBox.Size = UDim2.new(1, -16, 0, 26)
+    idBox.Position = UDim2.new(0, 8, 0, 10)
+    idBox.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    idBox.BorderSizePixel = 0
+    idBox.Text = ""
+    idBox.PlaceholderText = "Айди песни"
+    idBox.TextColor3 = WHITE
+    idBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 170)
+    idBox.TextSize = 12
+    idBox.Font = Enum.Font.Gotham
+    idBox.ClearTextOnFocus = false
+    local ibc = Instance.new("UICorner", idBox)
+    ibc.CornerRadius = UDim.new(0, 6)
+
+    -- Ряд 2: Название
+    local nameCard = Instance.new("Frame", CardContainer)
+    nameCard.Size = UDim2.new(0.96, 0, 0, 46)
+    nameCard.BackgroundColor3 = getThemeColor()
+    nameCard.BackgroundTransparency = getTransparency()
+    nameCard.BorderSizePixel = 0
+    local nc = Instance.new("UICorner", nameCard)
+    nc.CornerRadius = UDim.new(0, 8)
+    local nstroke = Instance.new("UIStroke", nameCard)
+    nstroke.Color = getAccentColor()
+    nstroke.Thickness = 1
+
+    local nameBox = Instance.new("TextBox", nameCard)
+    nameBox.Size = UDim2.new(1, -16, 0, 26)
+    nameBox.Position = UDim2.new(0, 8, 0, 10)
+    nameBox.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    nameBox.BorderSizePixel = 0
+    nameBox.Text = ""
+    nameBox.PlaceholderText = "Название"
+    nameBox.TextColor3 = WHITE
+    nameBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 170)
+    nameBox.TextSize = 12
+    nameBox.Font = Enum.Font.Gotham
+    nameBox.ClearTextOnFocus = false
+    local nbc = Instance.new("UICorner", nameBox)
+    nbc.CornerRadius = UDim.new(0, 6)
+
+    -- Ряд 3: Кнопки
+    local btnCard = Instance.new("Frame", CardContainer)
+    btnCard.Size = UDim2.new(0.96, 0, 0, 40)
+    btnCard.BackgroundColor3 = getThemeColor()
+    btnCard.BackgroundTransparency = getTransparency()
+    btnCard.BorderSizePixel = 0
+    local bc = Instance.new("UICorner", btnCard)
+    bc.CornerRadius = UDim.new(0, 8)
+    local bstroke = Instance.new("UIStroke", btnCard)
+    bstroke.Color = getAccentColor()
+    bstroke.Thickness = 1
+
+    local addBtn = Instance.new("TextButton", btnCard)
+    addBtn.Size = UDim2.new(0.47, -8, 0, 26)
+    addBtn.Position = UDim2.new(0, 8, 0, 7)
+    addBtn.BackgroundColor3 = getAccentColor()
+    addBtn.Text = "Добавить"
+    addBtn.TextColor3 = WHITE
+    addBtn.TextSize = 12
+    addBtn.Font = Enum.Font.GothamBold
+    addBtn.BorderSizePixel = 0
+    local abc = Instance.new("UICorner", addBtn)
+    abc.CornerRadius = UDim.new(0, 6)
+
+    local playBtn = Instance.new("TextButton", btnCard)
+    playBtn.Size = UDim2.new(0.47, -8, 0, 26)
+    playBtn.Position = UDim2.new(0.5, 4, 0, 7)
+    playBtn.BackgroundColor3 = getAccentColor()
+    playBtn.Text = radioIsPlaying and "Пауза" or "Играть"
+    playBtn.TextColor3 = WHITE
+    playBtn.TextSize = 12
+    playBtn.Font = Enum.Font.GothamBold
+    playBtn.BorderSizePixel = 0
+    local pbc = Instance.new("UICorner", playBtn)
+    pbc.CornerRadius = UDim.new(0, 6)
+
+    addBtn.MouseButton1Click:Connect(function()
+        local idText = idBox.Text:gsub("%D", "")
+        local nameText = nameBox.Text
+        if idText == "" then return end
+        if nameText == "" then nameText = "Track " .. idText end
+        table.insert(radioSongs, {id = tonumber(idText), name = nameText})
+        SaveRadio()
+        idBox.Text = ""
+        nameBox.Text = ""
+        showRadio()
+    end)
+
+    playBtn.MouseButton1Click:Connect(function()
+        toggleRadioPlay()
+        showRadio()
+    end)
+
+    -- Разделитель
+    local headerCard = Instance.new("Frame", CardContainer)
+    headerCard.Size = UDim2.new(0.96, 0, 0, 30)
+    headerCard.BackgroundColor3 = getThemeColor()
+    headerCard.BackgroundTransparency = getTransparency()
+    headerCard.BorderSizePixel = 0
+    local hcc = Instance.new("UICorner", headerCard)
+    hcc.CornerRadius = UDim.new(0, 8)
+
+    local headerLbl = Instance.new("TextLabel", headerCard)
+    headerLbl.Size = UDim2.new(1, -16, 1, 0)
+    headerLbl.Position = UDim2.new(0, 8, 0, 0)
+    headerLbl.BackgroundTransparency = 1
+    headerLbl.Text = "Список песен"
+    headerLbl.TextColor3 = WHITE
+    headerLbl.TextSize = 13
+    headerLbl.Font = Enum.Font.GothamBold
+    headerLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Список песен
+    for i, song in ipairs(radioSongs) do
+        local songCard = Instance.new("Frame", CardContainer)
+        songCard.Size = UDim2.new(0.96, 0, 0, 40)
+        songCard.BackgroundColor3 = getThemeColor()
+        songCard.BackgroundTransparency = getTransparency()
+        songCard.BorderSizePixel = 0
+        local scc = Instance.new("UICorner", songCard)
+        scc.CornerRadius = UDim.new(0, 8)
+        local sstroke = Instance.new("UIStroke", songCard)
+        sstroke.Color = getAccentColor()
+        sstroke.Thickness = 1
+
+        local num = Instance.new("TextLabel", songCard)
+        num.Size = UDim2.new(0, 24, 1, 0)
+        num.Position = UDim2.new(0, 4, 0, 0)
+        num.BackgroundTransparency = 1
+        num.Text = tostring(i)
+        num.TextColor3 = getAccentColor()
+        num.TextSize = 12
+        num.Font = Enum.Font.GothamBold
+
+        local nm = Instance.new("TextLabel", songCard)
+        nm.Size = UDim2.new(1, -120, 1, 0)
+        nm.Position = UDim2.new(0, 30, 0, 0)
+        nm.BackgroundTransparency = 1
+        nm.Text = song.name .. "  [" .. tostring(song.id) .. "]"
+        nm.TextColor3 = WHITE
+        nm.TextSize = 11
+        nm.Font = Enum.Font.Gotham
+        nm.TextXAlignment = Enum.TextXAlignment.Left
+        nm.TextTruncate = Enum.TextTruncate.AtEnd
+
+        local spb = Instance.new("TextButton", songCard)
+        spb.Size = UDim2.new(0, 40, 0, 26)
+        spb.Position = UDim2.new(1, -80, 0, 7)
+        spb.BackgroundColor3 = getAccentColor()
+        spb.Text = "Играть"
+        spb.TextColor3 = WHITE
+        spb.TextSize = 10
+        spb.Font = Enum.Font.GothamBold
+        spb.BorderSizePixel = 0
+        local spbc = Instance.new("UICorner", spb)
+        spbc.CornerRadius = UDim.new(0, 6)
+        spb.MouseButton1Click:Connect(function()
+            playRadioIndex(i)
+            showRadio()
+        end)
+
+        local sdb = Instance.new("TextButton", songCard)
+        sdb.Size = UDim2.new(0, 32, 0, 26)
+        sdb.Position = UDim2.new(1, -36, 0, 7)
+        sdb.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        sdb.Text = "X"
+        sdb.TextColor3 = WHITE
+        sdb.TextSize = 11
+        sdb.Font = Enum.Font.GothamBold
+        sdb.BorderSizePixel = 0
+        local sdbc = Instance.new("UICorner", sdb)
+        sdbc.CornerRadius = UDim.new(0, 6)
+        sdb.MouseButton1Click:Connect(function()
+            table.remove(radioSongs, i)
+            if radioCurrentIndex == i then stopRadio() end
+            SaveRadio()
+            showRadio()
+        end)
+    end
+
+    -- Панель управления
+    local ctrlCard = Instance.new("Frame", CardContainer)
+    ctrlCard.Size = UDim2.new(0.96, 0, 0, 76)
+    ctrlCard.BackgroundColor3 = getThemeColor()
+    ctrlCard.BackgroundTransparency = getTransparency()
+    ctrlCard.BorderSizePixel = 0
+    local ccc = Instance.new("UICorner", ctrlCard)
+    ccc.CornerRadius = UDim.new(0, 10)
+    local cstroke = Instance.new("UIStroke", ctrlCard)
+    cstroke.Color = getAccentColor()
+    cstroke.Thickness = 1
+
+    local prevBtn = Instance.new("TextButton", ctrlCard)
+    prevBtn.Size = UDim2.new(0, 44, 0, 26)
+    prevBtn.Position = UDim2.new(0, 8, 0, 8)
+    prevBtn.BackgroundColor3 = getThemeColor()
+    prevBtn.Text = "Пред"
+    prevBtn.TextColor3 = WHITE
+    prevBtn.TextSize = 10
+    prevBtn.Font = Enum.Font.GothamBold
+    prevBtn.BorderSizePixel = 0
+    local pvc = Instance.new("UICorner", prevBtn)
+    pvc.CornerRadius = UDim.new(0, 6)
+    prevBtn.MouseButton1Click:Connect(function()
+        if #radioSongs == 0 then return end
+        playRadioIndex(radioCurrentIndex - 1)
+        showRadio()
+    end)
+
+    local stopBtn = Instance.new("TextButton", ctrlCard)
+    stopBtn.Size = UDim2.new(0, 44, 0, 26)
+    stopBtn.Position = UDim2.new(0, 56, 0, 8)
+    stopBtn.BackgroundColor3 = getThemeColor()
+    stopBtn.Text = "Стоп"
+    stopBtn.TextColor3 = WHITE
+    stopBtn.TextSize = 10
+    stopBtn.Font = Enum.Font.GothamBold
+    stopBtn.BorderSizePixel = 0
+    local sbc = Instance.new("UICorner", stopBtn)
+    sbc.CornerRadius = UDim.new(0, 6)
+    stopBtn.MouseButton1Click:Connect(function()
+        stopRadio()
+        showRadio()
+    end)
+
+    local nextBtn = Instance.new("TextButton", ctrlCard)
+    nextBtn.Size = UDim2.new(0, 44, 0, 26)
+    nextBtn.Position = UDim2.new(0, 104, 0, 8)
+    nextBtn.BackgroundColor3 = getThemeColor()
+    nextBtn.Text = "След"
+    nextBtn.TextColor3 = WHITE
+    nextBtn.TextSize = 10
+    nextBtn.Font = Enum.Font.GothamBold
+    nextBtn.BorderSizePixel = 0
+    local nbc2 = Instance.new("UICorner", nextBtn)
+    nbc2.CornerRadius = UDim.new(0, 6)
+    nextBtn.MouseButton1Click:Connect(function()
+        if #radioSongs == 0 then return end
+        playRadioIndex(radioCurrentIndex + 1)
+        showRadio()
+    end)
+
+    local loopBtn = Instance.new("TextButton", ctrlCard)
+    loopBtn.Size = UDim2.new(0, 80, 0, 26)
+    loopBtn.Position = UDim2.new(0, 152, 0, 8)
+    loopBtn.BackgroundColor3 = radioLoop and getAccentColor() or getThemeColor()
+    loopBtn.Text = radioLoop and "Повтор ВКЛ" or "Повтор ВЫКЛ"
+    loopBtn.TextColor3 = WHITE
+    loopBtn.TextSize = 9
+    loopBtn.Font = Enum.Font.GothamBold
+    loopBtn.BorderSizePixel = 0
+    local lbc = Instance.new("UICorner", loopBtn)
+    lbc.CornerRadius = UDim.new(0, 6)
+    loopBtn.MouseButton1Click:Connect(function()
+        radioLoop = not radioLoop
+        SaveConfig()
+        showRadio()
+    end)
+
+    local volLbl = Instance.new("TextLabel", ctrlCard)
+    volLbl.Size = UDim2.new(1, -16, 0, 14)
+    volLbl.Position = UDim2.new(0, 8, 0, 40)
+    volLbl.BackgroundTransparency = 1
+    volLbl.Text = "Громкость: " .. math.floor(radioVolume * 100) .. "%"
+    volLbl.TextColor3 = WHITE
+    volLbl.TextSize = 10
+    volLbl.Font = Enum.Font.Gotham
+    volLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local volSlider = Instance.new("TextButton", ctrlCard)
+    volSlider.Size = UDim2.new(1, -16, 0, 10)
+    volSlider.Position = UDim2.new(0, 8, 0, 58)
+    volSlider.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
+    volSlider.Text = ""
+    volSlider.BorderSizePixel = 0
+    volSlider.AutoButtonColor = false
+    local vsc = Instance.new("UICorner", volSlider)
+    vsc.CornerRadius = UDim.new(1, 0)
+
+    local volFill = Instance.new("Frame", volSlider)
+    volFill.Size = UDim2.new(radioVolume, 0, 1, 0)
+    volFill.BackgroundColor3 = getAccentColor()
+    volFill.BorderSizePixel = 0
+    local vfc = Instance.new("UICorner", volFill)
+    vfc.CornerRadius = UDim.new(1, 0)
+
+    local volKnob = Instance.new("Frame", volSlider)
+    volKnob.Size = UDim2.new(0, 12, 1, 0)
+    volKnob.Position = UDim2.new(radioVolume, -6, 0, 0)
+    volKnob.BackgroundColor3 = WHITE
+    volKnob.BorderSizePixel = 0
+    local vkc = Instance.new("UICorner", volKnob)
+    vkc.CornerRadius = UDim.new(1, 0)
+
+    local volDrag = false
+    local function updateVol(input)
+        local x = input.Position.X
+        local absX = volSlider.AbsolutePosition.X
+        local sizeX = volSlider.AbsoluteSize.X
+        if sizeX > 0 then
+            local pos = math.clamp((x - absX) / sizeX, 0, 1)
+            radioVolume = pos
+            volFill.Size = UDim2.new(pos, 0, 1, 0)
+            volKnob.Position = UDim2.new(pos, -6, 0, 0)
+            volLbl.Text = "Громкость: " .. math.floor(pos * 100) .. "%"
+            if radioSound then radioSound.Volume = pos end
+            SaveConfig()
+        end
+    end
+    volSlider.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            volDrag = true updateVol(input)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            volDrag = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if volDrag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            updateVol(input)
+        end
+    end)
+
+    task.wait()
+    CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
+end
+
+-- Подключение кнопок категорий
 catButtons[1].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Визуал"
     createCards({fovFunc, stretchFunc, particlesFunc, skyParticlesFunc, trailsFunc, targetFunc, circleFunc, fogFunc, skyShaderFunc, dayNightFunc, deathEffectFunc, wastedFunc})
@@ -1561,16 +1966,13 @@ catButtons[3].MouseButton1Click:Connect(function()
     SectionTitle.Text = "Шейдеры"
     createCards({rtxShadowsFunc, rtxReflectionsFunc, glowFunc, auraFunc})
 end)
-
--- Вкладка "Анимации" — одноразовая: клик = загрузка скрипта, повторный клик игнорируется
 catButtons[4].MouseButton1Click:Connect(function()
-    if freeAnimsLoaded then return end  -- уже загружено — не даём нажать снова
+    if freeAnimsLoaded then return end
     SectionTitle.Text = "Анимации"
     for _, child in ipairs(CardContainer:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
     end
     freeAnimsLoaded = true
-    -- статус-карточка
     local card = Instance.new("Frame", CardContainer)
     card.BackgroundColor3 = getThemeColor()
     card.BackgroundTransparency = getTransparency()
@@ -1584,7 +1986,7 @@ catButtons[4].MouseButton1Click:Connect(function()
     title.Size = UDim2.new(1, -16, 0, 20)
     title.Position = UDim2.new(0, 8, 0, 5)
     title.BackgroundTransparency = 1
-    title.Text = "✔ Free Animations загружены"
+    title.Text = "Free Animations загружены"
     title.TextColor3 = WHITE
     title.TextSize = 12
     title.Font = Enum.Font.GothamBold
@@ -1601,55 +2003,57 @@ catButtons[4].MouseButton1Click:Connect(function()
     desc.TextXAlignment = Enum.TextXAlignment.Left
     task.wait()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
-
-    -- загружаем скрипт
     task.spawn(function()
         local ok, err = pcall(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/Bac0nHck/Scripts/refs/heads/main/BundleAnimations.lua"))()
         end)
         if not ok then
             warn("[Monvisual] Free Animations load error: " .. tostring(err))
-            freeAnimsLoaded = false  -- если не удалось — разрешаем попробовать снова
+            freeAnimsLoaded = false
         end
     end)
 end)
-
 catButtons[5].MouseButton1Click:Connect(function()
+    showRadio()
+end)
+catButtons[6].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- КНОПКА ВХОДА
-local OpenBorder = Instance.new("Frame", ScreenGui)
-OpenBorder.Size = UDim2.new(0, 160, 0, 44)
-OpenBorder.Position = UDim2.new(0.5, -80, 0.001, -3)
-OpenBorder.BackgroundColor3 = WHITE
-OpenBorder.BackgroundTransparency = 1
-OpenBorder.BorderSizePixel = 0
-OpenBorder.ZIndex = 1
-local obCorner = Instance.new("UICorner", OpenBorder)
-obCorner.CornerRadius = UDim.new(0, 12)
-
+-- ===== ДИНАМИК (одна строка, без обводки) =====
 local OpenBtn = Instance.new("TextButton", ScreenGui)
-OpenBtn.Size = UDim2.new(0, 156, 0, 40)
-OpenBtn.Position = UDim2.new(0.5, -78, 0.001, 0)
-OpenBtn.BackgroundColor3 = getThemeColor()
-OpenBtn.BackgroundTransparency = 1
+OpenBtn.Size = UDim2.new(0, 220, 0, 34)
+OpenBtn.Position = UDim2.new(0.5, -110, 0.005, 0)
+OpenBtn.BackgroundColor3 = BLACK
+OpenBtn.BackgroundTransparency = 0
 OpenBtn.TextColor3 = WHITE
 OpenBtn.TextSize = 12
 OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0
-OpenBtn.Text = "MONVISUAL\nFPS: " .. fpsValue
-OpenBtn.TextWrapped = true
+OpenBtn.Text = ""
 OpenBtn.ZIndex = 2
+OpenBtn.AutoButtonColor = false
 local oc = Instance.new("UICorner", OpenBtn)
-oc.CornerRadius = UDim.new(0, 10)
+oc.CornerRadius = UDim.new(0, 8)
 
-local OpenStroke = Instance.new("UIStroke", OpenBorder)
-OpenStroke.Color = WHITE
-OpenStroke.Thickness = 0.5
+local SpeakerLabel = Instance.new("TextLabel", OpenBtn)
+SpeakerLabel.Size = UDim2.new(1, -12, 1, 0)
+SpeakerLabel.Position = UDim2.new(0, 6, 0, 0)
+SpeakerLabel.BackgroundTransparency = 1
+SpeakerLabel.Text = "MONVISUAL | FPS: " .. fpsValue
+SpeakerLabel.TextColor3 = WHITE
+SpeakerLabel.TextSize = 12
+SpeakerLabel.Font = Enum.Font.GothamBold
+SpeakerLabel.TextXAlignment = Enum.TextXAlignment.Center
+SpeakerLabel.TextTruncate = Enum.TextTruncate.AtEnd
+SpeakerLabel.ZIndex = 3
 
-RunService.Heartbeat:Connect(function()
-    OpenBtn.Text = "MONVISUAL\nFPS: " .. fpsValue
+RunService.RenderStepped:Connect(function(dt)
+    if radioIsPlaying and radioSound and radioSongs[radioCurrentIndex] then
+        SpeakerLabel.Text = "♪ " .. radioSongs[radioCurrentIndex].name
+    else
+        SpeakerLabel.Text = "MONVISUAL | FPS: " .. fpsValue
+    end
 end)
 
 OpenBtn.MouseButton1Click:Connect(function()
@@ -1667,4 +2071,4 @@ updateTheme()
 
 catButtons[1].MouseButton1Click:Fire()
 
-print("Monvisual loaded!")
+print("Monvisual loaded! (Radio v41)")
