@@ -1867,11 +1867,10 @@ end)
 catButtons[6].MouseButton1Click:Connect(function()
     showThemes()
 end)
-
--- ===== ДИНАМИК (по центру сверху, у края, плавное скрытие) =====
+-- ===== ДИНАМИК (по центру, чуть ниже края, плавное скрытие) =====
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 200, 0, 30)
-OpenBtn.Position = UDim2.new(0.5, -100, 0, 0)
+OpenBtn.Position = UDim2.new(0.5, 0, 0.01, 0)
 OpenBtn.AnchorPoint = Vector2.new(0.5, 0)
 OpenBtn.BackgroundColor3 = BLACK
 OpenBtn.BackgroundTransparency = 0
@@ -1889,7 +1888,7 @@ local SpeakerLabel = Instance.new("TextLabel", OpenBtn)
 SpeakerLabel.Size = UDim2.new(1, -12, 1, 0)
 SpeakerLabel.Position = UDim2.new(0, 6, 0, 0)
 SpeakerLabel.BackgroundTransparency = 1
-SpeakerLabel.Text = "MONVISUAL | FPS: " .. fpsValue
+SpeakerLabel.Text = "MONVISUAL  FPS: " .. fpsValue
 SpeakerLabel.TextColor3 = WHITE
 SpeakerLabel.TextSize = 12
 SpeakerLabel.Font = Enum.Font.GothamBold
@@ -1903,7 +1902,7 @@ RunService.RenderStepped:Connect(function(dt)
         SpeakerLabel.Text = "♪ " .. radioSongs[radioCurrentIndex].name
         SpeakerLabel.TextSize = 16
     else
-        SpeakerLabel.Text = "MONVISUAL | FPS: " .. fpsValue
+        SpeakerLabel.Text = "MONVISUAL  FPS: " .. fpsValue
         SpeakerLabel.TextSize = 12
     end
 end)
@@ -1917,13 +1916,13 @@ local function animateSpeaker(show)
 
     local targetY
     if show then
-        targetY = -0.06
+        targetY = -0.05  -- полностью уезжает за верх экрана
     else
-        targetY = 0
+        targetY = 0.01
     end
 
     local tween = TweenService:Create(OpenBtn, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-        Position = UDim2.new(0.5, -100, targetY, 0)
+        Position = UDim2.new(0.5, 0, targetY, 0)
     })
     tween:Play()
 
@@ -1953,4 +1952,4 @@ updateTheme()
 
 catButtons[1].MouseButton1Click:Fire()
 
-print("Monvisual loaded! (Radio v45)")
+print("Monvisual loaded! (Radio v46)")
