@@ -1868,7 +1868,7 @@ catButtons[6].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- ===== ДИНАМИК (близко к экрану + новая анимация) =====
+-- ===== ДИНАМИК (по центру сверху, плавное скрытие) =====
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 200, 0, 30)
 OpenBtn.Position = UDim2.new(0.5, -100, 0, 0)
@@ -1908,7 +1908,7 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- Новая анимация: динамик уезжает вверх за экран при открытии меню, возвращается при закрытии
+-- Плавная анимация: как на кривой — быстро старт, мягко тормозит
 local speakerAnimating = false
 
 local function animateSpeaker(show)
@@ -1917,12 +1917,13 @@ local function animateSpeaker(show)
 
     local targetY
     if show then
-        targetY = -0.06  -- полностью за верхним краем
+        targetY = -0.06  -- уезжает за верх экрана
     else
         targetY = 0
     end
 
-    local tween = TweenService:Create(OpenBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+    -- Quint + Out = плавная кривая как на картинке
+    local tween = TweenService:Create(OpenBtn, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, -100, targetY, 0)
     })
     tween:Play()
@@ -1953,4 +1954,4 @@ updateTheme()
 
 catButtons[1].MouseButton1Click:Fire()
 
-print("Monvisual loaded! (Radio v44)")
+print("Monvisual loaded! (Radio v45)")
