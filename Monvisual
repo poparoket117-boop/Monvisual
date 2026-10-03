@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v42 - Radio clean)
+-- Monvisual GUI (Final v43 - Radio clean)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -855,6 +855,7 @@ RunService.RenderStepped:Connect(function()
         Camera.CFrame = Camera.CFrame * stretchCFrame
     end
 end)
+
 -- ================== GUI ==================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Monvisual"
@@ -1609,7 +1610,7 @@ local function showThemes()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
 end
 
--- ===== РАДИО (упрощённое) =====
+-- ===== РАДИО (без обводки текста) =====
 local function showRadio()
     SectionTitle.Text = "Радио"
     for _, child in ipairs(CardContainer:GetChildren()) do
@@ -1648,7 +1649,7 @@ local function showRadio()
     local idBox = makeField("Айди песни")
     local nameBox = makeField("Название")
 
-    -- Кнопки: Добавить + Играть
+    -- Кнопки Добавить / Играть (БЕЗ обводки текста)
     local btnCard = Instance.new("Frame", CardContainer)
     btnCard.Size = UDim2.new(0.96, 0, 0, 40)
     btnCard.BackgroundColor3 = getThemeColor()
@@ -1670,11 +1671,9 @@ local function showRadio()
     addBtn.Font = Enum.Font.GothamBold
     addBtn.BorderSizePixel = 0
     addBtn.AutoButtonColor = false
+    addBtn.TextStrokeTransparency = 1
     local abc = Instance.new("UICorner", addBtn)
     abc.CornerRadius = UDim.new(0, 6)
-    local abstroke = Instance.new("UIStroke", addBtn)
-    abstroke.Color = getAccentColor()
-    abstroke.Thickness = 1
 
     local playBtn = Instance.new("TextButton", btnCard)
     playBtn.Size = UDim2.new(0.47, -8, 0, 26)
@@ -1686,11 +1685,9 @@ local function showRadio()
     playBtn.Font = Enum.Font.GothamBold
     playBtn.BorderSizePixel = 0
     playBtn.AutoButtonColor = false
+    playBtn.TextStrokeTransparency = 1
     local pbc = Instance.new("UICorner", playBtn)
     pbc.CornerRadius = UDim.new(0, 6)
-    local pbstroke = Instance.new("UIStroke", playBtn)
-    pbstroke.Color = getAccentColor()
-    pbstroke.Thickness = 1
 
     addBtn.MouseButton1Click:Connect(function()
         local idText = idBox.Text:gsub("%D", "")
@@ -1709,7 +1706,7 @@ local function showRadio()
         showRadio()
     end)
 
-    -- Заголовок "Список песен"
+    -- Заголовок
     local headerCard = Instance.new("Frame", CardContainer)
     headerCard.Size = UDim2.new(0.96, 0, 0, 30)
     headerCard.BackgroundColor3 = getThemeColor()
@@ -1727,6 +1724,7 @@ local function showRadio()
     headerLbl.TextSize = 13
     headerLbl.Font = Enum.Font.GothamBold
     headerLbl.TextXAlignment = Enum.TextXAlignment.Left
+    headerLbl.TextStrokeTransparency = 1
 
     -- Список песен
     for i, song in ipairs(radioSongs) do
@@ -1749,6 +1747,7 @@ local function showRadio()
         num.TextColor3 = getAccentColor()
         num.TextSize = 12
         num.Font = Enum.Font.GothamBold
+        num.TextStrokeTransparency = 1
 
         local nm = Instance.new("TextLabel", songCard)
         nm.Size = UDim2.new(1, -120, 1, 0)
@@ -1760,6 +1759,7 @@ local function showRadio()
         nm.Font = Enum.Font.Gotham
         nm.TextXAlignment = Enum.TextXAlignment.Left
         nm.TextTruncate = Enum.TextTruncate.AtEnd
+        nm.TextStrokeTransparency = 1
 
         local spb = Instance.new("TextButton", songCard)
         spb.Size = UDim2.new(0, 40, 0, 26)
@@ -1771,11 +1771,9 @@ local function showRadio()
         spb.Font = Enum.Font.GothamBold
         spb.BorderSizePixel = 0
         spb.AutoButtonColor = false
+        spb.TextStrokeTransparency = 1
         local spbc = Instance.new("UICorner", spb)
         spbc.CornerRadius = UDim.new(0, 6)
-        local spbstroke = Instance.new("UIStroke", spb)
-        spbstroke.Color = getAccentColor()
-        spbstroke.Thickness = 1
         spb.MouseButton1Click:Connect(function()
             playRadioIndex(i)
             showRadio()
@@ -1791,11 +1789,9 @@ local function showRadio()
         sdb.Font = Enum.Font.GothamBold
         sdb.BorderSizePixel = 0
         sdb.AutoButtonColor = false
+        sdb.TextStrokeTransparency = 1
         local sdbc = Instance.new("UICorner", sdb)
         sdbc.CornerRadius = UDim.new(0, 6)
-        local sdbstroke = Instance.new("UIStroke", sdb)
-        sdbstroke.Color = Color3.fromRGB(180, 50, 50)
-        sdbstroke.Thickness = 1
         sdb.MouseButton1Click:Connect(function()
             table.remove(radioSongs, i)
             if radioCurrentIndex == i then stopRadio() end
@@ -1845,6 +1841,7 @@ catButtons[4].MouseButton1Click:Connect(function()
     title.TextSize = 12
     title.Font = Enum.Font.GothamBold
     title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextStrokeTransparency = 1
     local desc = Instance.new("TextLabel", card)
     desc.Size = UDim2.new(1, -16, 0, 24)
     desc.Position = UDim2.new(0, 8, 0, 26)
@@ -1855,6 +1852,7 @@ catButtons[4].MouseButton1Click:Connect(function()
     desc.Font = Enum.Font.Gotham
     desc.TextWrapped = true
     desc.TextXAlignment = Enum.TextXAlignment.Left
+    desc.TextStrokeTransparency = 1
     task.wait()
     CardContainer.CanvasSize = UDim2.new(0, 0, 0, cardLayout.AbsoluteContentSize.Y + 10)
     task.spawn(function()
@@ -1874,10 +1872,10 @@ catButtons[6].MouseButton1Click:Connect(function()
     showThemes()
 end)
 
--- ===== ДИНАМИК (одна строка, с анимацией) =====
+-- ===== ДИНАМИК =====
 local OpenBtn = Instance.new("TextButton", ScreenGui)
-OpenBtn.Size = UDim2.new(0, 220, 0, 34)
-OpenBtn.Position = UDim2.new(0.5, -110, 0.002, 0)
+OpenBtn.Size = UDim2.new(0, 200, 0, 30)
+OpenBtn.Position = UDim2.new(0.5, -100, 0.002, 0)
 OpenBtn.BackgroundColor3 = BLACK
 OpenBtn.BackgroundTransparency = 0
 OpenBtn.TextColor3 = WHITE
@@ -1888,7 +1886,7 @@ OpenBtn.Text = ""
 OpenBtn.ZIndex = 2
 OpenBtn.AutoButtonColor = false
 local oc = Instance.new("UICorner", OpenBtn)
-oc.CornerRadius = UDim.new(0, 8)
+oc.CornerRadius = UDim.new(0, 15)  -- сильно закруглённые края
 
 local SpeakerLabel = Instance.new("TextLabel", OpenBtn)
 SpeakerLabel.Size = UDim2.new(1, -12, 1, 0)
@@ -1900,27 +1898,42 @@ SpeakerLabel.TextSize = 12
 SpeakerLabel.Font = Enum.Font.GothamBold
 SpeakerLabel.TextXAlignment = Enum.TextXAlignment.Center
 SpeakerLabel.TextTruncate = Enum.TextTruncate.AtEnd
+SpeakerLabel.TextStrokeTransparency = 1
 SpeakerLabel.ZIndex = 3
 
 RunService.RenderStepped:Connect(function(dt)
     if radioIsPlaying and radioSound and radioSongs[radioCurrentIndex] then
         SpeakerLabel.Text = "♪ " .. radioSongs[radioCurrentIndex].name
+        SpeakerLabel.TextSize = 16  -- больше шрифт при игре
     else
         SpeakerLabel.Text = "MONVISUAL | FPS: " .. fpsValue
+        SpeakerLabel.TextSize = 12
     end
 end)
 
--- Анимация динамика
-local speakerBasePos = UDim2.new(0.5, -110, 0.002, 0)
-local speakerHiddenPos = UDim2.new(0.5, -110, -0.05, 0)
+-- Анимация сжатия (было: уезжает вверх)
+local speakerBaseSize = UDim2.new(0, 200, 0, 30)
+local speakerSmallSize = UDim2.new(0, 0, 0, 0)
+local speakerBasePos = UDim2.new(0.5, -100, 0.002, 0)
+local speakerSmallPos = UDim2.new(0.5, 0, 0.002, 0)
 local speakerAnimating = false
 
 local function animateSpeaker(show)
     if speakerAnimating then return end
     speakerAnimating = true
-    local target = show and speakerBasePos or speakerHiddenPos
-    local tween = TweenService:Create(OpenBtn, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Position = target
+    local targetSize, targetPos
+    if show then
+        -- открытие: сжимается в точку, потом разворачивается
+        targetSize = speakerSmallSize
+        targetPos = speakerSmallPos
+    else
+        -- закрытие: разжимается обратно
+        targetSize = speakerBaseSize
+        targetPos = speakerBasePos
+    end
+    local tween = TweenService:Create(OpenBtn, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.InOut), {
+        Size = targetSize,
+        Position = targetPos
     })
     tween:Play()
     tween.Completed:Connect(function()
@@ -1933,7 +1946,13 @@ _G.Monvisual_AnimateSpeaker = animateSpeaker
 OpenBtn.MouseButton1Click:Connect(function()
     local show = not Main.Visible
     toggleMenu(show)
-    animateSpeaker(show)
+    if show then
+        -- при открытии меню — сжимаем динамик
+        animateSpeaker(true)
+    else
+        -- при закрытии — возвращаем
+        animateSpeaker(false)
+    end
 end)
 
 UserInputService.InputBegan:Connect(function(input, processed)
@@ -1941,7 +1960,11 @@ UserInputService.InputBegan:Connect(function(input, processed)
     if input.KeyCode == Enum.KeyCode.RightShift then
         local show = not Main.Visible
         toggleMenu(show)
-        animateSpeaker(show)
+        if show then
+            animateSpeaker(true)
+        else
+            animateSpeaker(false)
+        end
     end
 end)
 
@@ -1949,4 +1972,4 @@ updateTheme()
 
 catButtons[1].MouseButton1Click:Fire()
 
-print("Monvisual loaded! (Radio v42)")
+print("Monvisual loaded! (Radio v43)")
