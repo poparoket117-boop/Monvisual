@@ -1875,7 +1875,7 @@ end)
 -- ===== ДИНАМИК =====
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 200, 0, 30)
-OpenBtn.Position = UDim2.new(0.5, -100, 0.002, 0)
+OpenBtn.Position = UDim2.new(0.5, -100, 0, 0)  -- ближе к экрану (самый верх)
 OpenBtn.BackgroundColor3 = BLACK
 OpenBtn.BackgroundTransparency = 0
 OpenBtn.TextColor3 = WHITE
@@ -1885,8 +1885,9 @@ OpenBtn.BorderSizePixel = 0
 OpenBtn.Text = ""
 OpenBtn.ZIndex = 2
 OpenBtn.AutoButtonColor = false
+OpenBtn.AnchorPoint = Vector2.new(0.5, 0)
 local oc = Instance.new("UICorner", OpenBtn)
-oc.CornerRadius = UDim.new(0, 15)  -- сильно закруглённые края
+oc.CornerRadius = UDim.new(0, 15)
 
 local SpeakerLabel = Instance.new("TextLabel", OpenBtn)
 SpeakerLabel.Size = UDim2.new(1, -12, 1, 0)
@@ -1904,38 +1905,40 @@ SpeakerLabel.ZIndex = 3
 RunService.RenderStepped:Connect(function(dt)
     if radioIsPlaying and radioSound and radioSongs[radioCurrentIndex] then
         SpeakerLabel.Text = "♪ " .. radioSongs[radioCurrentIndex].name
-        SpeakerLabel.TextSize = 16  -- больше шрифт при игре
+        SpeakerLabel.TextSize = 16
     else
         SpeakerLabel.Text = "MONVISUAL | FPS: " .. fpsValue
         SpeakerLabel.TextSize = 12
     end
 end)
 
--- Анимация сжатия (было: уезжает вверх)
-local speakerBaseSize = UDim2.new(0, 200, 0, 30)
-local speakerSmallSize = UDim2.new(0, 0, 0, 0)
-local speakerBasePos = UDim2.new(0.5, -100, 0.002, 0)
-local speakerSmallPos = UDim2.new(0.5, 0, 0.002, 0)
+-- ===== НОВАЯ АНИМАЦИЯ: уезжает вверх за экран и обратно =====
+local speakerY_visible = 0
+local speakerY_hidden = -0.06  -- полностью за верхним краем
 local speakerAnimating = false
+local speakerState = "visible"  -- visible / hidden
 
 local function animateSpeaker(show)
     if speakerAnimating then return end
     speakerAnimating = true
-    local targetSize, targetPos
+
+    local targetY
     if show then
-        -- открытие: сжимается в точку, потом разворачивается
-        targetSize = speakerSmallSize
-        targetPos = speakerSmallPos
+        -- при открытии меню — динамик уезжает вверх и прячется
+        targetY = speakerY_hidden
+        speakerState = "hidden"
     else
-        -- закрытие: разжимается обратно
-        targetSize = speakerBaseSize
-        targetPos = speakerBasePos
+        -- при закрытии — возвращается
+        targetY = speakerY_visible
+        speakerState = "visible"
     end
-    local tween = TweenService:Create(OpenBtn, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.InOut), {
-        Size = targetSize,
-        Position = targetPos
+
+    -- плавный "выезд" с лёгким отскоком
+    local tween = TweenService:Create(OpenBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0.5, -100, targetY, 0)
     })
     tween:Play()
+
     tween.Completed:Connect(function()
         speakerAnimating = false
     end)
@@ -1946,13 +1949,7 @@ _G.Monvisual_AnimateSpeaker = animateSpeaker
 OpenBtn.MouseButton1Click:Connect(function()
     local show = not Main.Visible
     toggleMenu(show)
-    if show then
-        -- при открытии меню — сжимаем динамик
-        animateSpeaker(true)
-    else
-        -- при закрытии — возвращаем
-        animateSpeaker(false)
-    end
+    animateSpeaker(show)
 end)
 
 UserInputService.InputBegan:Connect(function(input, processed)
@@ -1960,11 +1957,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
     if input.KeyCode == Enum.KeyCode.RightShift then
         local show = not Main.Visible
         toggleMenu(show)
-        if show then
-            animateSpeaker(true)
-        else
-            animateSpeaker(false)
-        end
+        animateSpeaker(show)
     end
 end)
 
@@ -1972,4 +1965,4 @@ updateTheme()
 
 catButtons[1].MouseButton1Click:Fire()
 
-print("Monvisual loaded! (Radio v43)")
+print("Monvisual loaded! (Radio v44)")
