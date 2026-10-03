@@ -1879,6 +1879,18 @@ OpenBtn.TextSize = 12
 OpenBtn.Font = Enum.Font.GothamBold
 OpenBtn.BorderSizePixel = 0
 OpenBtn.Text = ""
+-- ===== ДИНАМИК (у края, сужается при радио) =====
+local OpenBtn = Instance.new("TextButton", ScreenGui)
+OpenBtn.Size = UDim2.new(0, 200, 0, 30)
+OpenBtn.Position = UDim2.new(0.5, 0, 0, 0)
+OpenBtn.AnchorPoint = Vector2.new(0.5, 0)
+OpenBtn.BackgroundColor3 = BLACK
+OpenBtn.BackgroundTransparency = 0
+OpenBtn.TextColor3 = WHITE
+OpenBtn.TextSize = 12
+OpenBtn.Font = Enum.Font.GothamBold
+OpenBtn.BorderSizePixel = 0
+OpenBtn.Text = ""
 OpenBtn.ZIndex = 2
 OpenBtn.AutoButtonColor = false
 local oc = Instance.new("UICorner", OpenBtn)
@@ -1897,17 +1909,34 @@ SpeakerLabel.TextTruncate = Enum.TextTruncate.AtEnd
 SpeakerLabel.TextStrokeTransparency = 1
 SpeakerLabel.ZIndex = 3
 
+-- Отслеживание состояния "радио играет" для плавного сужения
+local wasRadioPlaying = false
 RunService.RenderStepped:Connect(function(dt)
     if radioIsPlaying and radioSound and radioSongs[radioCurrentIndex] then
         SpeakerLabel.Text = "♪ " .. radioSongs[radioCurrentIndex].name
-        SpeakerLabel.TextSize = 16
+        SpeakerLabel.TextSize = 14
     else
         SpeakerLabel.Text = "MONVISUAL  FPS: " .. fpsValue
         SpeakerLabel.TextSize = 12
     end
+
+    -- Плавное сужение/расширение динамика при старте/стопе радио
+    local nowPlaying = radioIsPlaying and radioSound ~= nil
+    if nowPlaying ~= wasRadioPlaying then
+        wasRadioPlaying = nowPlaying
+        local targetSize
+        if nowPlaying then
+            targetSize = UDim2.new(0, 100, 0, 30)  -- сужается в 2 раза
+        else
+            targetSize = UDim2.new(0, 200, 0, 30)  -- обратно
+        end
+        TweenService:Create(OpenBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = targetSize
+        }):Play()
+    end
 end)
 
--- Плавная анимация: Quint + Out — кривая как на скрине
+-- Плавная анимация скрытия динамика при открытии меню
 local speakerAnimating = false
 
 local function animateSpeaker(show)
@@ -1916,9 +1945,9 @@ local function animateSpeaker(show)
 
     local targetY
     if show then
-        targetY = -0.05  -- полностью уезжает за верх экрана
+        targetY = -0.05  -- уезжает за верх экрана
     else
-        targetY = 0.01
+        targetY = 0
     end
 
     local tween = TweenService:Create(OpenBtn, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
@@ -1952,4 +1981,4 @@ updateTheme()
 
 catButtons[1].MouseButton1Click:Fire()
 
-print("Monvisual loaded! (Radio v46)")
+print("Monvisual loaded! (Radio v47)")
