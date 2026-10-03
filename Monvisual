@@ -1,4 +1,4 @@
--- Monvisual GUI (Final v43 - Radio clean)
+-- Monvisual GUI (Final v44)
 if _G.Monvisual_Loaded then
     pcall(function() _G.Monvisual_ScreenGui:Destroy() end)
     _G.Monvisual_Loaded = false
@@ -855,7 +855,6 @@ RunService.RenderStepped:Connect(function()
         Camera.CFrame = Camera.CFrame * stretchCFrame
     end
 end)
-
 -- ================== GUI ==================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Monvisual"
@@ -1649,7 +1648,6 @@ local function showRadio()
     local idBox = makeField("Айди песни")
     local nameBox = makeField("Название")
 
-    -- Кнопки Добавить / Играть (БЕЗ обводки текста)
     local btnCard = Instance.new("Frame", CardContainer)
     btnCard.Size = UDim2.new(0.96, 0, 0, 40)
     btnCard.BackgroundColor3 = getThemeColor()
@@ -1706,7 +1704,6 @@ local function showRadio()
         showRadio()
     end)
 
-    -- Заголовок
     local headerCard = Instance.new("Frame", CardContainer)
     headerCard.Size = UDim2.new(0.96, 0, 0, 30)
     headerCard.BackgroundColor3 = getThemeColor()
@@ -1726,7 +1723,6 @@ local function showRadio()
     headerLbl.TextXAlignment = Enum.TextXAlignment.Left
     headerLbl.TextStrokeTransparency = 1
 
-    -- Список песен
     for i, song in ipairs(radioSongs) do
         local songCard = Instance.new("Frame", CardContainer)
         songCard.Size = UDim2.new(0.96, 0, 0, 40)
@@ -1871,10 +1867,12 @@ end)
 catButtons[6].MouseButton1Click:Connect(function()
     showThemes()
 end)
--- ===== ДИНАМИК =====
+
+-- ===== ДИНАМИК (близко к экрану + новая анимация) =====
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 200, 0, 30)
-OpenBtn.Position = UDim2.new(0.5, -100, 0, 0)  -- ближе к экрану (самый верх)
+OpenBtn.Position = UDim2.new(0.5, -100, 0, 0)
+OpenBtn.AnchorPoint = Vector2.new(0.5, 0)
 OpenBtn.BackgroundColor3 = BLACK
 OpenBtn.BackgroundTransparency = 0
 OpenBtn.TextColor3 = WHITE
@@ -1884,7 +1882,6 @@ OpenBtn.BorderSizePixel = 0
 OpenBtn.Text = ""
 OpenBtn.ZIndex = 2
 OpenBtn.AutoButtonColor = false
-OpenBtn.AnchorPoint = Vector2.new(0.5, 0)
 local oc = Instance.new("UICorner", OpenBtn)
 oc.CornerRadius = UDim.new(0, 15)
 
@@ -1911,11 +1908,8 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- ===== НОВАЯ АНИМАЦИЯ: уезжает вверх за экран и обратно =====
-local speakerY_visible = 0
-local speakerY_hidden = -0.06  -- полностью за верхним краем
+-- Новая анимация: динамик уезжает вверх за экран при открытии меню, возвращается при закрытии
 local speakerAnimating = false
-local speakerState = "visible"  -- visible / hidden
 
 local function animateSpeaker(show)
     if speakerAnimating then return end
@@ -1923,16 +1917,11 @@ local function animateSpeaker(show)
 
     local targetY
     if show then
-        -- при открытии меню — динамик уезжает вверх и прячется
-        targetY = speakerY_hidden
-        speakerState = "hidden"
+        targetY = -0.06  -- полностью за верхним краем
     else
-        -- при закрытии — возвращается
-        targetY = speakerY_visible
-        speakerState = "visible"
+        targetY = 0
     end
 
-    -- плавный "выезд" с лёгким отскоком
     local tween = TweenService:Create(OpenBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, -100, targetY, 0)
     })
